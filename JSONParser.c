@@ -19,9 +19,6 @@ static JSONError_t parseJSONNull(JSONParser_t* parser, char* message, int size);
 static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size, JSONValue_t** result);
 static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size, JSONKeyValue_t** result);
 static JSONError_t parseJSONKey(JSONParser_t* parser, char* message, int size);
-static int pushProgress(JSONParser_t* parser, char* function);
-static int popProgress(JSONParser_t* parser);
-
 /*----------------------------------------------------------------
  * Implement global functions
  *--------------------------------------------------------------*/
@@ -50,6 +47,29 @@ JSONParser_t* newJSONParser(){
 }
 
 /**
+ * Resets the parser object so it can be used on another message. Although
+ * the parseJSONMessage will reset the parser after a successful parsing it
+ * will be necessary to reset the parser manually after an error occurs. 
+ * this does not clear any of the accounting data out of the struct.
+ * 
+ * @param parser - The parser object that needs to be cleared
+ */
+void resetParser(JSONParser_t* parser){
+   if (!parser){
+      return;
+   }
+   
+   parser->index = 0;
+   parser->state = NEW;
+   parser->lineNumber = 0;
+   parser->depth = 0;
+   parser->keyStackIndex = 0;
+   
+   return;
+}
+
+
+/**
  * Builds the document model for the specific JSON message that has 
  * come in. 
  * 
@@ -71,7 +91,6 @@ JSONParser_t* newJSONParser(){
  */
 JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, char* message, int* lastIndex){
    if (!parser || !document || !message){
-      PUSH_ERROR(NULL_ARGUMENT, "Expected a pointer, but found NULL");
       return NULL_ARGUMENT;
    }
    
@@ -104,27 +123,45 @@ JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, ch
       if (returnStatus != SUCCESS){
          switch (returnStatus){
             case MESSAGE_INCOMPLETE :
-               PUSH_ERROR(MESSAGE_INCOMPLETE, "The parsed message was found to be incomplete, please run again with the rest of the message");
+               parser->lastStatus = MESSAGE_INCOMPLETE;
+               parser->incompleteMessages++;
                return MESSAGE_INCOMPLETE;
                break;
             default :
-               PUSH_ERROR(PARSER_ERROR, "Unable to parse message, there are unresolved errors");
+               PUSH_ERROR(PARSER_ERROR, "Unable to parse message, see error stack for more details");
+               parser->lastStatus = PARSER_ERROR;
                return PARSER_ERROR;
                break;
          }
       }
       
-      
       *document = newJSONPair(OBJECT, NULL, objectValue);
       
-   }
-   else if (parser->state != NEW && parser->lastStatus == MESSAGE_INCOMPLETE){
-      //Complete the message parsing here.
+      //Look forward down the message to see if another JOSN message starts
+      //if it does, report the index of that message in lastIndex
+      while(parser->index < messageLength && message[parser->index] != '{'){
+         //If we find something other then a space or '{', no more messages
+         if (isgraph(message[parser->index++])){
+            break;
+         }
+         parser->index++;
+      }
+      
+      if (message[parser->index] == '{'){
+         *lastIndex = parser->index;
+      }
+      else {
+         *lastIndex = -1;
+      }
+      
    }
    else{
-      //Some weird state, need to reject untill corrected. 
+      PUSH_ERROR(PARSER_ERROR, "Parser is not in a good state, unable to parse message");
+      return PARSER_ERROR;
    }
    
+   resetParser(parser);
+   parser->messagesParsed++;
    return SUCCESS;
 }
 
@@ -144,7 +181,13 @@ JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, ch
  * @return SUCCESS if the string was parsed correctly, error otherwise (see stack trace)
  */
 static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size, char** result) {
-   int tempSize = 30;
+   if (!parser){
+      PUSH_ERROR(NULL_ARGUMENT, "Not parser object was passed into the function");
+      parser->lastStatus = NULL_ARGUMENT;
+      return NULL_ARGUMENT;
+   }
+   
+   int tempSize = 256;
    char* temp = (char*) malloc(sizeof(char) * (tempSize + 1));
    
    if(!temp){
@@ -220,8 +263,7 @@ static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size
    
    if (parser->index >= size){
       free(temp);
-      PUSH_ERROR(UNEXPECTED_EOF, "Parsing incomplete, hit end of file while reading string object");
-      return UNEXPECTED_EOF;
+      return MESSAGE_INCOMPLETE;
    }
    
    temp[tempIndex] = '\0';
@@ -286,7 +328,6 @@ static JSONError_t parseJSONNumber(JSONParser_t* parser, char* message, int size
    }
    
    if (parser->index >= size){
-      PUSH_ERROR(MESSAGE_INCOMPLETE, "Hit the end of the message while parsing number value");
       return MESSAGE_INCOMPLETE;
    }
    
@@ -342,7 +383,6 @@ static JSONError_t parseJSONBoolean(JSONParser_t* parser, char* message, int siz
    }
    
    if (parser->index >= size){
-      PUSH_ERROR(MESSAGE_INCOMPLETE, "Hit the end of the message while parsing boolean value");
       return MESSAGE_INCOMPLETE;
    }
    
@@ -395,7 +435,6 @@ static JSONError_t parseJSONNull(JSONParser_t* parser, char* message, int size) 
    }
    
    if (parser->index >= size){
-      PUSH_ERROR(MESSAGE_INCOMPLETE, "Hit the end of the message while parsing null value");
       return MESSAGE_INCOMPLETE;
    }
    
@@ -427,7 +466,6 @@ static JSONError_t parseJSONNull(JSONParser_t* parser, char* message, int size) 
  * @return SUCCESS if the object was parsed correctly, error otherwise (see stack trace)
  */
 static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size, JSONValue_t** result) {
-   
    if (parser->depth >= MAX_DEPTH){
       PUSH_ERROR(MESSAGE_TOO_LARGE, "The maximum amount of nested objects has been exceeded");
       return MESSAGE_TOO_LARGE;
@@ -441,6 +479,7 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
    }
    
    JSONError_t returnStatus;
+   
    
    parser->state &= CLEAR_STATE;
    parser->state |= (KEY | QUOTE | CLOSE_PREN | NULL_VALUE);
@@ -462,8 +501,13 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                   parser->state |= (COMMA | CLOSE_PREN);
                }
                else {
-                  PUSH_ERROR(PARSER_ERROR, "Error while trying to parse a null object");
-                  return PARSER_ERROR;
+                  if (returnStatus == MESSAGE_INCOMPLETE){
+                     return MESSAGE_INCOMPLETE;
+                  }
+                  else {
+                     PUSH_ERROR(PARSER_ERROR, "Error while trying to parse a null object");
+                     return PARSER_ERROR;
+                  }
                }
             }
             else {
@@ -488,8 +532,13 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                   parser->state |= (COMMA | CLOSE_PREN);
                }
                else {
-                  PUSH_ERROR(PARSER_ERROR, "Parser expected a boolean, but did not find one");
-                  return PARSER_ERROR;
+                  if (returnStatus == MESSAGE_INCOMPLETE){
+                     return MESSAGE_INCOMPLETE;
+                  }
+                  else {
+                     PUSH_ERROR(PARSER_ERROR, "Parser expected a boolean, but did not find one");
+                     return PARSER_ERROR;
+                  }
                }
             }
             else {
@@ -520,8 +569,13 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                parser->state |= (COMMA | CLOSE_PREN);
             }
             else {
-               PUSH_ERROR(PARSER_ERROR, "Invalid number found while parsing JSON object");
-               return PARSER_ERROR;
+               if (returnStatus == MESSAGE_INCOMPLETE){
+                     return MESSAGE_INCOMPLETE;
+               }
+               else {
+                  PUSH_ERROR(PARSER_ERROR, "Invalid number found while parsing JSON object");
+                  return PARSER_ERROR;
+               }
             }
          }
          else {
@@ -537,8 +591,13 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                //If we are expecting a key, we will read it in and place it on the stack
                returnStatus = parseJSONKey(parser, message, size);
                if (returnStatus){
-                  PUSH_ERROR(PARSER_ERROR, "Error parsing key while parsing JSON object");
-                  return PARSER_ERROR;
+                  if (returnStatus == MESSAGE_INCOMPLETE){
+                     return MESSAGE_INCOMPLETE;
+                  }
+                  else {
+                     PUSH_ERROR(PARSER_ERROR, "Error parsing key while parsing JSON object");
+                     return PARSER_ERROR;
+                  }
                }
                
                parser->state &= CLEAR_STATE;
@@ -560,8 +619,13 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                   parser->state |= (COMMA | CLOSE_PREN);
                }
                else {
-                  PUSH_ERROR(PARSER_ERROR, "Error parsing string while parsing JSON object");
-                  return PARSER_ERROR;
+                  if (returnStatus == MESSAGE_INCOMPLETE){
+                     return MESSAGE_INCOMPLETE;
+                  }
+                  else {
+                     PUSH_ERROR(PARSER_ERROR, "Error parsing string while parsing JSON object");
+                     return PARSER_ERROR;
+                  }
                }
             }
             else {
@@ -588,8 +652,13 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                   parser->state |= (COMMA | CLOSE_PREN);
                }
                else {
-                  PUSH_ERROR(PARSER_ERROR, "Unable to parser JSON object");
-                  return PARSER_ERROR;
+                  if (returnStatus == MESSAGE_INCOMPLETE){
+                     return MESSAGE_INCOMPLETE;
+                  }
+                  else {
+                     PUSH_ERROR(PARSER_ERROR, "Unable to parser JSON object");
+                     return PARSER_ERROR;
+                  }
                }
             }
             else {
@@ -621,8 +690,13 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                   parser->state |= (COMMA | CLOSE_PREN);
                }
                else {
-                  PUSH_ERROR(PARSER_ERROR, "Error while parsing array object");
-                  return PARSER_ERROR;
+                  if (returnStatus == MESSAGE_INCOMPLETE){
+                     return MESSAGE_INCOMPLETE;
+                  }
+                  else {
+                     PUSH_ERROR(PARSER_ERROR, "Error while parsing array object");
+                     return PARSER_ERROR;
+                  }
                }
             }
          }
@@ -653,7 +727,6 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
    }
    
    if (parser->index >= size){
-      PUSH_ERROR(MESSAGE_INCOMPLETE, "Hit the end of the message while parsing object value");
       return MESSAGE_INCOMPLETE;
    }
    
@@ -706,8 +779,13 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
                   parser->state |= (COMMA | CLOSE_BRACKET);
                }
                else {
-                  PUSH_ERROR(PARSER_ERROR, "Invalid null value found while parsing JSON array");
-                  return PARSER_ERROR;
+                  if (returnStatus == MESSAGE_INCOMPLETE){
+                     return MESSAGE_INCOMPLETE;
+                  }
+                  else {
+                     PUSH_ERROR(PARSER_ERROR, "Invalid null value found while parsing JSON array");
+                     return PARSER_ERROR;
+                  }
                }
             }
             else {
@@ -729,8 +807,13 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
                   parser->state |= (COMMA | CLOSE_BRACKET);
                }
                else {
-                  PUSH_ERROR(PARSER_ERROR, "Invalid boolean found while parsing JSON array");
-                  return PARSER_ERROR;
+                  if (returnStatus == MESSAGE_INCOMPLETE){
+                     return MESSAGE_INCOMPLETE;
+                  }
+                  else {
+                     PUSH_ERROR(PARSER_ERROR, "Invalid boolean found while parsing JSON array");
+                     return PARSER_ERROR;
+                  }
                }
             }
             else {
@@ -759,8 +842,13 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
                parser->state |= (COMMA | CLOSE_BRACKET);
             }
             else {
-               PUSH_ERROR(PARSER_ERROR, "Invalid number found while parsing JSON array");
-               return PARSER_ERROR;
+               if (returnStatus == MESSAGE_INCOMPLETE){
+                     return MESSAGE_INCOMPLETE;
+               }
+               else {
+                  PUSH_ERROR(PARSER_ERROR, "Invalid number found while parsing JSON array");
+                  return PARSER_ERROR;
+               }
             }
          }
          else {
@@ -784,8 +872,13 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
                   parser->state |= (COMMA | CLOSE_BRACKET);
                }
                else {
-                  PUSH_ERROR(PARSER_ERROR, "Error parsing string while parsing JSON array");
-                  return PARSER_ERROR;
+                  if (returnStatus == MESSAGE_INCOMPLETE){
+                     return MESSAGE_INCOMPLETE;
+                  }
+                  else {
+                     PUSH_ERROR(PARSER_ERROR, "Error parsing string while parsing JSON array");
+                     return PARSER_ERROR;
+                  }
                }
             }
             else {
@@ -809,8 +902,13 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
                   parser->state |= (COMMA | CLOSE_BRACKET);
                }
                else {
-                  PUSH_ERROR(PARSER_ERROR, "Unable to parser JSON object");
-                  return PARSER_ERROR;
+                  if (returnStatus == MESSAGE_INCOMPLETE){
+                     return MESSAGE_INCOMPLETE;
+                  }
+                  else {
+                     PUSH_ERROR(PARSER_ERROR, "Unable to parser JSON object");
+                     return PARSER_ERROR;
+                  }
                }
             }
             else {
@@ -838,8 +936,13 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
                   parser->state |= (COMMA | CLOSE_BRACKET);
                }
                else {
-                  PUSH_ERROR(PARSER_ERROR, "Error while parsing an enclosed array object");
-                  return PARSER_ERROR;
+                  if (returnStatus == MESSAGE_INCOMPLETE){
+                     return MESSAGE_INCOMPLETE;
+                  }
+                  else {
+                     PUSH_ERROR(PARSER_ERROR, "Error while parsing an enclosed array object");
+                     return PARSER_ERROR;
+                  }
                }
             }
          }
@@ -884,7 +987,6 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
    }
    
    if (parser->index >= size){
-      PUSH_ERROR(MESSAGE_INCOMPLETE, "Hit the end of the message while parsing array value");
       return MESSAGE_INCOMPLETE;
    }
    
@@ -965,7 +1067,6 @@ static JSONError_t  parseJSONKey(JSONParser_t* parser, char* message, int size){
    }
    
    if (parser->index >= size){
-      PUSH_ERROR(MESSAGE_INCOMPLETE, "Hit the end of the message while parsing JSON key");
       return MESSAGE_INCOMPLETE;
    }
    

@@ -1,7 +1,9 @@
 #ifndef _JSON_TOOLS_H
 #define _JSON_TOOLS_H
 
+#ifndef _ISOC99_SOURCE
 #define _ISOC99_SOURCE
+#endif
 
 /**
  * \mainpage Welcome to the JSONTools library documentation page

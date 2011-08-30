@@ -8,7 +8,6 @@
 #define CLEAR_ITEM               0xFFFFFF00
 #define CLEAR_CHARACTER          0xFFFF00FF
 #define MAX_DEPTH                256
-#define INCOMPLETE_BUFFER_SIZE   256
 
 /**
  * The ParserState type is designed to be used by the parser as a look
@@ -32,7 +31,9 @@ typedef enum {
    OPEN_PREN =       0x00001000, /**< Looking for '{' character to signify beginning of object */
    CLOSE_PREN =      0x00002000, /**< Looking for '}' character to signify end of object */
    OPEN_BRACKET =    0x00004000, /**< Looking for '[' character to signify beginning of array */
-   CLOSE_BRACKET =   0x00008000  /**< Looking for ']' character to signify end of array */
+   CLOSE_BRACKET =   0x00008000, /**< Looking for ']' character to signify end of array */
+   
+   RESUME =          0x00010000  /**< Resume a previously incomplete message */
    
 } ParserState_t;
 
@@ -44,14 +45,10 @@ typedef enum {
 typedef struct {
    int depth;     /**< Keeps track of how many brackets have been found */
    int index;     /**< The current position in the message string */
+   int lineNumber;            /**< The current line number of the document being parsed */ 
    JSONError_t lastStatus;    /**< the last status reported by the parser */
-   char* progressStack[MAX_DEPTH]; /**< the function that is executing while parsing the message. used for resuming incomplete messages */
    char* keyStack[KEY_STACK_SIZE];  /**< the key names in the key:value pairs */
    int keyStackIndex;         /**< where we are in the key stack */
-   int progressStackIndex;    /**< where we are in the progress stack */
-   
-   char buffer[INCOMPLETE_BUFFER_SIZE + 1]; /**< Hold what is about to be parsed, useful for resuming incomplete messages */
-   int bufferIndex; /**< where we are in the incomplete data buffer */
    
    ParserState_t state;       /**< What are we looking for in the message */
    
@@ -59,7 +56,6 @@ typedef struct {
    int messagesParsed;        /**< How many messages have been parsed with this parser */
    int keyValuesParsed;       /**< How many key:value pairs have been parsed */
    int incompleteMessages;    /**< How many incomplete messages were resumed */
-   int lineNumber;            /**< The current line number of the document being parsed */  
 } JSONParser_t;
 
 /*------------------------------------------------------------------
@@ -71,6 +67,7 @@ extern "C" {
 #endif
 
 JSONParser_t* newJSONParser();
+void resetParser(JSONParser_t* parser);
 JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, char* message, int* lastIndex);
 
 #ifdef CPP
