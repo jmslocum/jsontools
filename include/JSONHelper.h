@@ -5,7 +5,7 @@
 #include "JSONCommon.h"
 #include "JSONError.h"
 
-#ifdef CPP
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -22,7 +22,7 @@ char** getElementKeys(JSONKeyValue_t* element, int* size);
 void disposeOfPair(JSONKeyValue_t* pair);
 JSONError_t convertString(const char* origional, char** coverted);
 
-#ifdef CPP
+#ifdef __cplusplus
 }
 #endif
 

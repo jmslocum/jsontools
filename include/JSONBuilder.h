@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include "JSONCommon.h"
 
-#ifdef CPP
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -17,7 +17,7 @@ JSONValue_t* addKeyValuePair(JSONValue_t* object, JSONKeyValue_t* pair);
 JSONKeyValue_t* newJSONArray(char* key, void* array[], JSONType_t types[], int length);
 JSONKeyValue_t* newJSONPair(JSONType_t type, char* key, JSONValue_t* value);
 
-#ifdef CPP
+#ifdef __cplusplus
 }
 #endif
 

@@ -26,15 +26,28 @@ int main(int argc, char **argv)
    
    char message[fileSize];
    
-   fread(message, sizeof(char), fileSize, jsonMessage);
-   fclose(jsonMessage);
+   long long sizeForTest = 3;
+   fread(message, sizeof(char), sizeForTest, jsonMessage);
+   //fclose(jsonMessage);
+   
+   message[sizeForTest] = '\0';
    
    JSONParser_t* parser = newJSONParser();
    JSONKeyValue_t* document;
    int lastIndex = 0;
    JSONError_t status = parseJSONMessage(parser, &document, message, &lastIndex);
    
+   while(status == MESSAGE_INCOMPLETE){
+      //fread(message, sizeof(char), sizeForTest, jsonMessage);
+      fprintf(stdout, "Retry parsing message...\n");
+      message[sizeForTest++] = fgetc(jsonMessage);
+      message[sizeForTest] = '\0';
+      resetParser(parser);
+      status = parseJSONMessage(parser, &document, message, &lastIndex);
+   }
+   
    if (status){
+  
       char* errorReport = getErrorReport();
       fprintf(stderr, "%s\n", errorReport);
       
@@ -45,15 +58,6 @@ int main(int argc, char **argv)
       fprintf(stderr, "line = %d\n", parser->lineNumber);
       fprintf(stderr, "index = %d\n", parser->index);
       exit(status);
-   }
-   
-   //Test the remove function
-   if (!removeChildPair(document, "unicodeString")){
-      fprintf(stdout, "Found and removed unicodeString element\n");
-   }
-   
-   if (!removeChildPair(document, "array")){
-      fprintf(stdout, "Found and removed array element\n");
    }
    
    char* parsedDocument;
@@ -69,36 +73,7 @@ int main(int argc, char **argv)
    fprintf(stdout, "%s\n", parsedDocument);
    free(parsedDocument);
    
-   int size = 0;
-   char** documentKeys = getElementKeys(document, &size);
-   JSONKeyValue_t* temp = NULL;
-   for (int i = 0; i < size; i++){
-      fprintf(stdout, "key->%s\n", documentKeys[i]);
-      if ((getChildPair(document, documentKeys[i]))->type == OBJECT){
-         temp = getChildPair(document, documentKeys[i]);
-         fprintf(stdout, "\tThis is an object\n");
-         int tempSize = 0;
-         char** tempKeys = getElementKeys(temp, &tempSize);
-         for (int j = 0; j < tempSize; j++){
-            fprintf(stdout, "\tobjKey->%s\n", tempKeys[j]);
-         }
-         free(tempKeys);
-      }
-   }
-   
-   JSONKeyValue_t* unicode = getChildPair(document, "unicodeString");
-   char* conv;
-   if (unicode){
-      if (convertString(unicode->value->sVal, &conv) == SUCCESS){
-         fprintf(stdout, "%s\n", conv);
-      }
-      else{
-         fprintf(stdout, "Unable to convert unicode string\n");
-      }
-   }
-   
    //free(conv);
-   free(documentKeys);
    disposeOfPair(document);
    free(parser);
 	

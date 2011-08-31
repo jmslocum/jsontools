@@ -62,7 +62,7 @@ typedef struct {
  * Define global functions
  *----------------------------------------------------------------*/
 
-#ifdef CPP
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -70,7 +70,7 @@ JSONParser_t* newJSONParser();
 void resetParser(JSONParser_t* parser);
 JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, char* message, int* lastIndex);
 
-#ifdef CPP
+#ifdef __cplusplus
 }
 #endif
 

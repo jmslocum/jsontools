@@ -60,7 +60,7 @@ JSONErrorStack_t json_errorStack;
  * Define global functions
  *-------------------------------------------------------------*/
  
-#ifdef CPP
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -68,7 +68,7 @@ void pushError(JSONError_t error, const char* currentFunction, const char* curre
 char* getErrorReport();
 void clearErrorStack();
 
-#ifdef CPP
+#ifdef __cplusplus
 }
 #endif
 

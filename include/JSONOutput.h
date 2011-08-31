@@ -3,13 +3,13 @@
 
 #include "JSONCommon.h"
 
-#ifdef CPP
+#ifdef __cplusplus
 extern "C" {
 #endif
 
 JSONError_t documentToString(JSONKeyValue_t* document, char** output, int* length);
 
-#ifdef CPP
+#ifdef __cplusplus
 }
 #endif
 

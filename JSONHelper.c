@@ -290,43 +290,50 @@ JSONError_t getArray(JSONKeyValue_t* pair, void* values[], JSONType_t types[]){
    int index = 0;
    while(current != NULL){
       switch(current->type){
-         case STRING:
+         case STRING: {
             types[index] = STRING;
             values[index] = current->value->sVal;
             break;
+         }
          
-         case NUMBER:
+         case NUMBER: {
             types[index] = NUMBER;
             double* newNum = (double*)malloc(sizeof(double));
             *newNum = current->value->nVal;
             values[index] = newNum;
             break;
+         }
          
-         case BOOLEAN:
+         case BOOLEAN: {
             types[index] = BOOLEAN;
             bool* newBool = (bool*)malloc(sizeof(bool));
             *newBool = current->value->bVal;
             values[index] = newBool;
             break;
+         }
             
-         case NIL:
+         case NIL: {
             types[index] = NIL;
             values[index] = NULL;
             break;
+         }
             
-         case OBJECT:
+         case OBJECT: {
             types[index] = OBJECT;
             values[index] = current->value->oVal;
             break;
+         }
             
-         case ARRAY:
+         case ARRAY: {
             types[index] = ARRAY;
             values[index] = current->value->aVal;
             break;
+         }
          
-         default:
+         default: {
             return INVALID_TYPE;
             break;
+         }
       }
       
       index++;
