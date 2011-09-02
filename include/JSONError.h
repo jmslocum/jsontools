@@ -37,7 +37,6 @@ typedef enum {
    INTERNAL_FAILURE =            0x00800000  /**< A stdlib function failed */
 } JSONError_t;
 
-int json_errno;
 
 /**
  * Define the error stack type that will hold the necessary information
@@ -51,10 +50,6 @@ typedef struct {
    int stackIndex;                     /**< where we are in the stack */
 } JSONErrorStack_t;
 
-/**
- * The globally shared error stack
- */
-JSONErrorStack_t json_errorStack;
 
 /*--------------------------------------------------------------
  * Define global functions

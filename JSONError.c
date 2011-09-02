@@ -4,6 +4,13 @@
 
 #include "JSONError.h"
 
+int json_errno;
+
+/**
+ * The globally shared error stack
+ */
+JSONErrorStack_t json_errorStack;
+
 /**
  * Push an error onto the stack to be reported back to the calling function
  * NOTE that this function should be accessed via the PUSH_ERROR macro
