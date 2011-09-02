@@ -110,7 +110,7 @@ JSONError_t documentToString(JSONKeyValue_t* document, char** output, int* lengt
       strcat(*output, values[document->length - 1]);
       strcat(*output, "\n");
    }
-   strcat(*output, "}");
+   strcat(*output, "}\n");
    
    strLen = strlen(*output);
    *output = (char*) realloc(*output, strLen + 1);
