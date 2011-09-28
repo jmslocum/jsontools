@@ -26,7 +26,7 @@ int main(int argc, char **argv)
    
    char message[fileSize];
    
-   long long sizeForTest = 3;
+   long long sizeForTest = fileSize;
    fread(message, sizeof(char), sizeForTest, jsonMessage);
    //fclose(jsonMessage);
    

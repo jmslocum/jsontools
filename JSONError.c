@@ -6,6 +6,35 @@
 
 int json_errno;
 
+static char* errorDescriptions[] = {
+   "Success",
+   "Unknown Failure",
+   "The argument passed to a library function was NULL",
+   "The value in a key:value pair was NULL when it should not have been",
+   "The key in a key:value pair was NULL when it should not have been",
+   "The message is not valid JSON",
+   "The argument passed to a library function is of the wrong type",
+   "The type specified in a pair does not exist",
+   "The string contains characters that are not allowed by JSON",
+   "A recurrsive call faied, calling the current call to fail",
+   "An extra closing bracket was found while parsing the message",
+   "An extra closing brace was found while parsing the message",
+   "The end of the message was reached in the middle of parsing",
+   "A numeric value was found where there should not be one",
+   "A string was found (quote really) where there should not be one",
+   "A value was found instead of a key",
+   "A key was found instead of a value or delimiter",
+   "An object '{' was found where there should not be one",
+   "An unquoted character was found where there should not be one",
+   "An array '[' was found where there should not be one",
+   "a delimiter ':' was found where there should not be one",
+   "The message being parsed has over 256 nested objects",
+   "The message ends unexpectdly",
+   "The number value is out of range for a double type",
+   "The pair that was being searched for was not found",
+   "A stdlib function failed",
+};
+
 /**
  * The globally shared error stack
  */
@@ -88,4 +117,15 @@ void clearErrorStack(){
    }
    
    json_errorStack.stackIndex = 0;
+}
+
+/**
+ * Returns a description of the specific error number
+ */
+const char* json_strerror(int errno){
+   if (errno < 0 || errno > INTERNAL_FAILURE){
+      return errorDescriptions[1];
+   }
+   
+   return errorDescriptions[errno];
 }

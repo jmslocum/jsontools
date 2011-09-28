@@ -26,7 +26,40 @@ static int convertToUTF8(unsigned int character, char utfBytes[]);
 /*------------------------------------------------------------------
  * Implement global functions
  *-----------------------------------------------------------------*/
- 
+
+/**
+ * Looks to see if there is a child for this parent. This is useful if
+ * you want to test a key before you attempt to reterive it. 
+ * 
+ * @param parent - The parent key:value pair whos value is another key:value pair
+ * 
+ * @param key - The key string of the key:value pair you want to reterive. 
+ * 
+ * @return - The true if the key exists, false otherwise
+ */
+bool hasChildPair(JSONKeyValue_t* parent, const char* key){
+   if (!parent || !key){
+      return false;
+   }
+   
+   if (parent->type != OBJECT){
+      return false;
+   }
+   
+   JSONKeyValue_t* current = parent->value->oVal;
+   while(current != NULL){
+      if (current->type != NIL){
+         if (strcmp(current->key, key) == 0){
+            return true;
+         }
+      }
+      
+      current = current->next;
+   }
+   
+   return false;
+}
+
 /**
  * Gets the child element for this JSON object. This is useful to reterive
  * nested key:value pairs from JSON object types. If this key value pair 
@@ -414,6 +447,95 @@ JSONError_t getBoolean(JSONKeyValue_t* pair, bool* value){
    
    return SUCCESS;
 }
+
+/**
+ * This function returns they value type of the pair, This prevents the
+ * library user from having to directly access the pair object to 
+ * gather any information about it. This will return NIL if the 
+ * specified pair is NULL, or if the pair value is actaully NIL. 
+ * 
+ * @param pair - The JSONKeyValue_t* that you want to find the type of
+ * @return - The type of the pair
+ */
+JSONType_t getPairType(JSONKeyValue_t* pair){
+   if (!pair){
+      return NIL;
+   }
+   
+   return pair->type;
+}
+
+/**
+ * This function returns the string value that this pair has. It is 
+ * automatically assumed that this pair has a string. If the pair
+ * is not a string, it will return NULL. It can also return NULL
+ * if the string itself is NULL. If you need more error handling 
+ * use the getString() function provided
+ * 
+ * @param pair - The JSONKeyValue_t* that you want to get the string value from
+ * @return - The string value if there is one, NULL otherwise
+ * @see getString
+ */
+const char* getStringVal(JSONKeyValue_t* pair){
+   if (!pair){
+      return NULL;
+   }
+   
+   if (pair->type == STRING){
+      return (const char*)pair->value->sVal;
+   }
+   
+   return NULL;
+}
+
+
+/**
+ * This function returns the number value that the pair has. It is 
+ * automatically assumed that this pair has a number. If the pair is 
+ * not a number a 0.0 is returned. If the actaul value is 0.0 then 0.0 
+ * is returned. If you need more error handling use the getNumber()
+ * function provided
+ * 
+ * @param pair - The JSONKeyValue_t* that you want to get the number value from 
+ * @return - The number value, or 0.0 if this is not a number.
+ * @see getNumber
+ */
+double getNumberVal(JSONKeyValue_t* pair){
+   if (!pair){
+      return 0.0;
+   }
+   
+   if (pair->type == NUMBER){
+      return pair->value->nVal;
+   }
+   
+   return 0.0;
+}
+
+
+/**
+ * This function returns the boolean value that a pair has. It is 
+ * automatically assumed that this pair has a boolean value. If the pair
+ * is not a boolean, then false is returned. If the actual value of 
+ * the boolean is a false, then a false is returned. If you need more
+ * error handling use the getBoolean() function provided.
+ * 
+ * @param pair - The JSONKeyValue_t* that you want to get the boolean value from
+ * @return - The boolean value, or false if this is not a boolean
+ * @see getBoolean
+ */
+bool getBooleanVal(JSONKeyValue_t* pair){
+   if (!pair){
+      return false;
+   }
+   
+   if (pair->type == BOOLEAN){
+      return pair->value->bVal;
+   }
+   
+   return false;
+}
+
 
 /**
  * Retreves a list of keys for the elements contained under the passed

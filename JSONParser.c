@@ -103,10 +103,24 @@ JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, ch
       while(parser->index < messageLength && message[parser->index] != '{'){
          //If we find something other then a space or '{', we have a problem
          if (isgraph(message[parser->index++])){
-            char temp[50];
-            sprintf(temp, "Looking for '{' but found '%c'", message[parser->index - 1]);
-            PUSH_ERROR(INVALID_MESSAGE, temp);
-            return INVALID_MESSAGE;
+            if (message[parser->index - 1] == '/' && message[parser->index] == '*'){
+               //Found a comment, we need to read ahead to get past it
+               parser->index++;
+               while(parser->index < messageLength){
+                  if (message[parser->index++] == '*'){
+                     if (message[parser->index++] == '/'){
+                        //Found end of comment
+                        break;
+                     }
+                  }
+               }
+            }
+            else {
+               char temp[50];
+               sprintf(temp, "Looking for '{' but found '%c'", message[parser->index - 1]);
+               PUSH_ERROR(INVALID_MESSAGE, temp);
+               return INVALID_MESSAGE;
+            }
          }
       }
       
@@ -139,9 +153,10 @@ JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, ch
       
       //Look forward down the message to see if another JOSN message starts
       //if it does, report the index of that message in lastIndex
+      parser->index++;  //Step past last '}' character
       while(parser->index < messageLength && message[parser->index] != '{'){
          //If we find something other then a space or '{', no more messages
-         if (isgraph(message[parser->index++])){
+         if (isgraph(message[parser->index])){
             break;
          }
          parser->index++;
