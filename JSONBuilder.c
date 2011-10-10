@@ -139,7 +139,7 @@ JSONValue_t* newJSONNumber(double number) {
    JSONValue_t* newNumber = (JSONValue_t*) malloc(sizeof(JSONValue_t));
    
    if (newNumber == NULL) {
-      PUSH_ERROR(INTERNAL_FAILURE, "Unable to allocate memeory for JSON number");
+      json_errno = JSON_MALLOC_FAIL;
       return NULL;
    }
    
@@ -162,7 +162,7 @@ JSONValue_t* newJSONBoolean(bool boolean) {
    JSONValue_t* newBoolean = (JSONValue_t*) malloc(sizeof(JSONValue_t));
    
    if (newBoolean == NULL) {
-      PUSH_ERROR(INTERNAL_FAILURE, "Unable to allocate memory for boolean object");
+      json_errno = JSON_MALLOC_FAIL;
       return NULL;
    }
    
@@ -216,7 +216,7 @@ JSONValue_t* addKeyValuePair(JSONValue_t* object, JSONKeyValue_t* pair){
             memcpy(object->oVal, pair, sizeof(JSONKeyValue_t));
          }
          else {
-            PUSH_ERROR(INTERNAL_FAILURE, "Unable to allocate memory for pair");
+            json_errno = JSON_MALLOC_FAIL;
             return NULL;
          }
       }
@@ -230,7 +230,7 @@ JSONValue_t* addKeyValuePair(JSONValue_t* object, JSONKeyValue_t* pair){
       }
    }
    else {
-      PUSH_ERROR(NULL_ARGUMENT, "The arguments were null");
+      json_errno = JSON_NULL_ARGUMENT;
       return NULL;
    }
    
@@ -289,7 +289,7 @@ JSONKeyValue_t* newJSONArray(char* key, void* array[], JSONType_t types[], int l
                memcpy(element, ((JSONKeyValue_t*)array[i]), sizeof(JSONKeyValue_t));
             }
             else {
-               PUSH_ERROR(INTERNAL_FAILURE, "Unable to allocate memory for array object");
+               json_errno = JSON_MALLOC_FAIL;
                return NULL;
             }
             break;

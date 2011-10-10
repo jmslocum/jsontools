@@ -4,10 +4,13 @@
 #include "JSONCommon.h"
 #include "JSONError.h"
 
+#define PUSH_ERROR(parser, error, errNo) (pushError(parser, error, __func__, __FILE__, __LINE__, errNo))
+
 #define CLEAR_STATE              0x00000000
 #define CLEAR_ITEM               0xFFFFFF00
 #define CLEAR_CHARACTER          0xFFFF00FF
 #define MAX_DEPTH                256
+#define TRACE_LENGTH             512
 
 /**
  * The ParserState type is designed to be used by the parser as a look
@@ -46,7 +49,6 @@ typedef struct {
    int depth;     /**< Keeps track of how many brackets have been found */
    int index;     /**< The current position in the message string */
    int lineNumber;            /**< The current line number of the document being parsed */ 
-   JSONError_t lastStatus;    /**< the last status reported by the parser */
    char* keyStack[KEY_STACK_SIZE];  /**< the key names in the key:value pairs */
    int keyStackIndex;         /**< where we are in the key stack */
    
@@ -56,6 +58,11 @@ typedef struct {
    int messagesParsed;        /**< How many messages have been parsed with this parser */
    int keyValuesParsed;       /**< How many key:value pairs have been parsed */
    int incompleteMessages;    /**< How many incomplete messages were resumed */
+   
+   //Some debugging info
+   char tracebackString[TRACE_LENGTH]; /**< Holds a plain text description of the problem, and where it occurred */
+   int jsonError;             /**< The last json_errno value */
+   int outsideError;          /**< the errno.h errno value if there is one, -1 otherwise */
 } JSONParser_t;
 
 /*------------------------------------------------------------------

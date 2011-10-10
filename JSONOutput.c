@@ -34,14 +34,14 @@ static char* indent(int depth);
  * 
  * @param length - the actual length of the output string, or -1 if the max is too small
  * 
- * @return SUCCESS if everything converted properly, an error otherwise
+ * @return JSON_SUCCESS if everything converted properly, an error otherwise
  * 
  * @see JSONError_t
  */
 JSONError_t documentToString(JSONKeyValue_t* document, char** output, int* length) {
    if (document == NULL) {
-      PUSH_ERROR(NULL_ARGUMENT, "A null argument was passed into the function");
-      return NULL_ARGUMENT;
+      json_errno = JSON_NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
       
@@ -86,8 +86,8 @@ JSONError_t documentToString(JSONKeyValue_t* document, char** output, int* lengt
             break;
             
          default:
-            PUSH_ERROR(INVALID_TYPE, "An invalid JSON type was specified");
-            return INVALID_TYPE;
+            json_errno = JSON_INVALID_TYPE;
+            return JSON_INVALID_TYPE;
       }
       
       currentElement = currentElement->next;
@@ -121,7 +121,7 @@ JSONError_t documentToString(JSONKeyValue_t* document, char** output, int* lengt
          free(values[i]);
    }
    
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /*-------------------------------------------------------------------
@@ -137,13 +137,13 @@ JSONError_t documentToString(JSONKeyValue_t* document, char** output, int* lengt
  * @param output - The key and string value converted into a JSON message
  * @param depth - The indentation level of the message
  * @param length - The size of the JSON message after it has been converted, 
- * @return SUCCESS if the pair was converted into a JSON message, error otherwise (see stack trace)
+ * @return JSON_SUCCESS if the pair was converted into a JSON message, error otherwise
  */
 static JSONError_t writeJSONString(JSONKeyValue_t* pair, char** output, int depth, int* length){
    if (pair){
       if (pair->type != STRING){
-         PUSH_ERROR(INVALID_ARGUMENT, "Requested pair is not a string");
-         return INVALID_ARGUMENT;
+         json_errno = JSON_INVALID_ARGUMENT;
+         return JSON_INVALID_ARGUMENT;
       }
       
       //We will need to calculate exactly how much room in memeory is need
@@ -166,8 +166,8 @@ static JSONError_t writeJSONString(JSONKeyValue_t* pair, char** output, int dept
          strLen = sprintf(*output, "%s\"%s\"", ind, pair->value->sVal);
       }
       else{
-         PUSH_ERROR(NULL_VALUE, "The value of the string pair was NULL");
-         return NULL_VALUE;
+         json_errno = JSON_NULL_VALUE;
+         return JSON_NULL_VALUE;
       }
       
       free(ind);
@@ -178,11 +178,11 @@ static JSONError_t writeJSONString(JSONKeyValue_t* pair, char** output, int dept
       
    }
    else{
-      PUSH_ERROR(NULL_ARGUMENT, "The pair passed to the function is NULL");
-      return NULL_ARGUMENT;
+      json_errno = JSON_NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /**
@@ -194,18 +194,18 @@ static JSONError_t writeJSONString(JSONKeyValue_t* pair, char** output, int dept
  * @param output - The key and string value converted into a JSON message
  * @param depth - The indentation level of the message
  * @param length - The size of the JSON message after it has been converted, 
- * @return SUCCESS if the pair was converted into a JSON message, error otherwise (see stack trace)
+ * @return JSON_SUCCESS if the pair was converted into a JSON message, error otherwise
  */
 static JSONError_t writeJSONNumber(JSONKeyValue_t* pair, char** output, int depth, int* length){
    if (pair){
       if (pair->type != NUMBER){
-         PUSH_ERROR(INVALID_ARGUMENT, "Requested pair is not a number");
-         return INVALID_ARGUMENT;
+         json_errno = JSON_INVALID_ARGUMENT;
+         return JSON_INVALID_ARGUMENT;
       }
       
       if (!pair->value){
-         PUSH_ERROR(NULL_VALUE, "The value of the number pair was NULL");
-         return NULL_VALUE;
+         json_errno = JSON_NULL_VALUE;
+         return JSON_NULL_VALUE;
       }
       
       //Need to see if the number has a fractional part, if it does
@@ -248,13 +248,13 @@ static JSONError_t writeJSONNumber(JSONKeyValue_t* pair, char** output, int dept
          }
       }
       else {
-          PUSH_ERROR(NULL_VALUE, "The value of the number pair was NULL");
-         return NULL_VALUE;
+          json_errno = JSON_NULL_VALUE;
+         return JSON_NULL_VALUE;
       }
       
       if (strLen < 0){
-         PUSH_ERROR(INTERNAL_FAILURE, "Unable to make string with sprintf()");
-         return INTERNAL_FAILURE;
+         json_errno = JSON_INTERNAL_FAILURE;
+         return JSON_INTERNAL_FAILURE;
       }
       
       //Shrink string down to exact size
@@ -263,11 +263,11 @@ static JSONError_t writeJSONNumber(JSONKeyValue_t* pair, char** output, int dept
       free(ind);
    }
    else {
-      PUSH_ERROR(NULL_ARGUMENT, "The pair passed to the function was NULL"); 
-      return NULL_ARGUMENT; 
+      json_errno = JSON_NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT; 
    }
    
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /**
@@ -278,13 +278,13 @@ static JSONError_t writeJSONNumber(JSONKeyValue_t* pair, char** output, int dept
  * @param output - The key and string value converted into a JSON message
  * @param depth - The indentation level of the message
  * @param length - The size of the JSON message after it has been converted, 
- * @return SUCCESS if the pair was converted into a JSON message, error otherwise (see stack trace)
+ * @return JSON_SUCCESS if the pair was converted into a JSON message, error otherwise
  */
 static JSONError_t writeJSONBoolean(JSONKeyValue_t* pair, char** output, int depth, int* length){
    if (pair){
       if (pair->type != BOOLEAN){
-         PUSH_ERROR(INVALID_ARGUMENT, "Requested pair is not a boolean");
-         return INVALID_ARGUMENT;
+         json_errno = JSON_INVALID_ARGUMENT;
+         return JSON_INVALID_ARGUMENT;
       }
       
       char* t = "true";
@@ -310,7 +310,7 @@ static JSONError_t writeJSONBoolean(JSONKeyValue_t* pair, char** output, int dep
          strLen = sprintf(*output, "%s%s", ind, ((pair->value->bVal) ? t : f));
       }
       else {
-         return NULL_VALUE;
+         return JSON_NULL_VALUE;
       }
       
       //Shrink string down to exact size
@@ -319,10 +319,10 @@ static JSONError_t writeJSONBoolean(JSONKeyValue_t* pair, char** output, int dep
       free(ind);
    }
    else{
-      PUSH_ERROR(NULL_ARGUMENT, "The arguments passed to the function were NULL");
-      return INVALID_ARGUMENT;
+      json_errno = JSON_INVALID_ARGUMENT;
+      return JSON_INVALID_ARGUMENT;
    }
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /**
@@ -335,18 +335,18 @@ static JSONError_t writeJSONBoolean(JSONKeyValue_t* pair, char** output, int dep
  * @param output - The key and string value converted into a JSON message
  * @param depth - The indentation level of the message
  * @param length - The size of the JSON message after it has been converted, 
- * @return SUCCESS if the pair was converted into a JSON message, error otherwise (see stack trace)
+ * @return JSON_SUCCESS if the pair was converted into a JSON message, error otherwise
  */
 static JSONError_t writeJSONObject(JSONKeyValue_t* pair, char** output, int depth, int* length){
    if (pair){
       if (pair->type != OBJECT) {
-         PUSH_ERROR(INVALID_ARGUMENT, "Requested pair is not an object");
-         return INVALID_ARGUMENT;
+         json_errno = JSON_INVALID_ARGUMENT;
+         return JSON_INVALID_ARGUMENT;
       }
       
       if (!pair->value || !pair->value->oVal) {
-         PUSH_ERROR(NULL_VALUE, "The value of the object is NULL");
-         return NULL_VALUE;
+         json_errno = JSON_NULL_VALUE;
+         return JSON_NULL_VALUE;
       }
       
       //Find out how many children we have 
@@ -403,9 +403,14 @@ static JSONError_t writeJSONObject(JSONKeyValue_t* pair, char** output, int dept
                break;
                
             default:
-               PUSH_ERROR(INVALID_TYPE, "Unknown type defined in object");
-               return INVALID_TYPE;
+               json_errno = JSON_INVALID_TYPE;
+               return JSON_INVALID_TYPE;
          }
+         
+         if (status != JSON_SUCCESS){
+            return status;
+         }
+         
          current = current->next;
       }
       
@@ -446,11 +451,11 @@ static JSONError_t writeJSONObject(JSONKeyValue_t* pair, char** output, int dept
       
    }
    else{
-      PUSH_ERROR(NULL_ARGUMENT, "The arguments passed to the function were NULL");
-      return NULL_ARGUMENT;
+      json_errno = JSON_NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /**
@@ -461,13 +466,13 @@ static JSONError_t writeJSONObject(JSONKeyValue_t* pair, char** output, int dept
  * @param output - The key and string value converted into a JSON message
  * @param depth - The indentation level of the message
  * @param length - The size of the JSON message after it has been converted, 
- * @return SUCCESS if the pair was converted into a JSON message, error otherwise (see stack trace)
+ * @return JSON_SUCCESS if the pair was converted into a JSON message, error otherwise
  */
 static JSONError_t writeJSONArray(JSONKeyValue_t* pair, char** output, int depth, int* length){
    if (pair){
       if (pair->type != ARRAY){
-         PUSH_ERROR(INVALID_ARGUMENT, "Requested pair is not an array");
-         return INVALID_ARGUMENT;
+         json_errno = JSON_INVALID_ARGUMENT;
+         return JSON_INVALID_ARGUMENT;
       }
       
       //We will need to calculate exactly how much room in memeory is need
@@ -515,12 +520,16 @@ static JSONError_t writeJSONArray(JSONKeyValue_t* pair, char** output, int depth
                break;
                
             default:
-               PUSH_ERROR(INVALID_TYPE, "Invalid type found in array");
-               return INVALID_TYPE;
+               json_errno = JSON_INVALID_TYPE;
+               return JSON_INVALID_TYPE;
                break;
             
          }
-
+         
+         if (status != JSON_SUCCESS){
+            return status;
+         }
+         
          current = current->next;
       }
       
@@ -564,11 +573,11 @@ static JSONError_t writeJSONArray(JSONKeyValue_t* pair, char** output, int depth
       
    }
    else {
-      PUSH_ERROR(NULL_ARGUMENT, "The arguments passed to the function were NULL");
-      return NULL_ARGUMENT;
+      json_errno = JSON_NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /**
@@ -579,13 +588,13 @@ static JSONError_t writeJSONArray(JSONKeyValue_t* pair, char** output, int depth
  * @param output - The key and string value converted into a JSON message
  * @param depth - The indentation level of the message
  * @param length - The size of the JSON message after it has been converted, 
- * @return SUCCESS if the pair was converted into a JSON message, error otherwise (see stack trace)
+ * @return JSON_SUCCESS if the pair was converted into a JSON message, error otherwise
  */
 static JSONError_t writeJSONNull(JSONKeyValue_t* pair, char** output, int depth, int* length) {
    if (pair) {
       if (pair->type != NIL) {
-         PUSH_ERROR(INVALID_ARGUMENT, "Requested pair is not a null");
-         return INVALID_ARGUMENT;
+         json_errno = JSON_INVALID_ARGUMENT;
+         return JSON_INVALID_ARGUMENT;
       }
       
       //We will need to calculate exactly how much room in memeory is need
@@ -604,11 +613,11 @@ static JSONError_t writeJSONNull(JSONKeyValue_t* pair, char** output, int depth,
       free(ind);
    }
    else {
-      PUSH_ERROR(NULL_ARGUMENT, "The arguments passed to the function were NULL");
-      return NULL_ARGUMENT;
+      json_errno = JSON_NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /**

@@ -35,46 +35,40 @@ int main(int argc, char **argv)
    JSONParser_t* parser = newJSONParser();
    JSONKeyValue_t* document;
    int lastIndex = 0;
-   JSONError_t status = parseJSONMessage(parser, &document, message, &lastIndex);
+   int currentIndex = 0;
+   JSONError_t status;
    
-   while(status == MESSAGE_INCOMPLETE){
-      //fread(message, sizeof(char), sizeForTest, jsonMessage);
-      fprintf(stdout, "Retry parsing message...\n");
-      message[sizeForTest++] = fgetc(jsonMessage);
-      message[sizeForTest] = '\0';
-      resetParser(parser);
-      status = parseJSONMessage(parser, &document, message, &lastIndex);
-   }
-   
-   if (status){
-  
-      char* errorReport = getErrorReport();
-      fprintf(stderr, "%s\n", errorReport);
+   do {
+      status = parseJSONMessage(parser, &document, &message[currentIndex], &lastIndex);
+      currentIndex += lastIndex;
       
-      for (int i = parser->keyStackIndex - 1; i >= 0; i--){
-         fprintf(stderr, "key->%s\n", parser->keyStack[i]);
+      if (status){
+         char* errorReport = parser->tracebackString;
+         fprintf(stderr, "%s\n", errorReport);
+         
+         for (int i = parser->keyStackIndex - 1; i >= 0; i--){
+            fprintf(stderr, "key->%s\n", parser->keyStack[i]);
+         }
+         
+         exit(status);
       }
       
-      fprintf(stderr, "line = %d\n", parser->lineNumber);
-      fprintf(stderr, "index = %d\n", parser->index);
-      exit(status);
-   }
+      char* parsedDocument;
+      int messageLength;
+      status = documentToString(document, &parsedDocument, &messageLength);
+      
+      if (status){
+         const char* errorReport = json_strerror(json_errno);
+         fprintf(stderr, "%s\n", errorReport);
+         exit(status);
+      }
+      
+      fprintf(stdout, "%s\n", parsedDocument);
+      free(parsedDocument);
+      disposeOfPair(document);
+      
+   } while(status == JSON_SUCCESS && lastIndex > 0);
    
-   char* parsedDocument;
-   int messageLength;
-   status = documentToString(document, &parsedDocument, &messageLength);
-   
-   if (status){
-      char* errorReport = getErrorReport();
-      fprintf(stderr, "%s\n", errorReport);
-      exit(status);
-   }
-   
-   fprintf(stdout, "%s\n", parsedDocument);
-   free(parsedDocument);
-   
-   //free(conv);
-   disposeOfPair(document);
    free(parser);
 	
 	return 0;

@@ -19,6 +19,7 @@ static JSONError_t parseJSONNull(JSONParser_t* parser, char* message, int size);
 static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size, JSONValue_t** result);
 static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size, JSONKeyValue_t** result);
 static JSONError_t parseJSONKey(JSONParser_t* parser, char* message, int size);
+static void pushError(JSONParser_t* parser, JSONError_t error, const char* currentFunction, const char* currentFile, int line, int errNo);
 /*----------------------------------------------------------------
  * Implement global functions
  *--------------------------------------------------------------*/
@@ -34,7 +35,7 @@ JSONParser_t* newJSONParser(){
    JSONParser_t* newParser = (JSONParser_t*) malloc(sizeof(JSONParser_t));
    
    if (!newParser){
-      PUSH_ERROR(INTERNAL_FAILURE, "Unable to allocate memory for JSONParser object");
+      json_errno = JSON_MALLOC_FAIL;
       return NULL;
    }
    
@@ -64,6 +65,9 @@ void resetParser(JSONParser_t* parser){
    parser->lineNumber = 0;
    parser->depth = 0;
    parser->keyStackIndex = 0;
+   memset(parser->tracebackString, 0, sizeof(char) * TRACE_LENGTH);
+   parser->jsonError = 0;
+   parser->outsideError = -1;
    
    return;
 }
@@ -85,13 +89,13 @@ void resetParser(JSONParser_t* parser){
  *    necessary since it will parse up until the last '}' char, or '\0' 
  *    character. 
  * 
- * @return SUCCESS if the message was parsed correctly, an error otherwise.
- *    The problem will be pushed onto a stack and be be reterived, and used
- *    to debug the problem with the message.
+ * @return JSON_SUCCESS if the message was parsed correctly, an error otherwise.
  */
 JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, char* message, int* lastIndex){
    if (!parser || !document || !message){
-      return NULL_ARGUMENT;
+      PUSH_ERROR(parser, JSON_NULL_ARGUMENT, -1);
+      json_errno = JSON_NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
    int messageLength = strlen(message);
@@ -116,10 +120,9 @@ JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, ch
                }
             }
             else {
-               char temp[50];
-               sprintf(temp, "Looking for '{' but found '%c'", message[parser->index - 1]);
-               PUSH_ERROR(INVALID_MESSAGE, temp);
-               return INVALID_MESSAGE;
+               PUSH_ERROR(parser, JSON_INVALID_MESSAGE, -1);
+               json_errno = JSON_INVALID_MESSAGE;
+               return JSON_INVALID_MESSAGE;
             }
          }
       }
@@ -128,23 +131,21 @@ JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, ch
       
       //If we never found the '{' and ran out of message
       if (parser->index >= messageLength){
-         PUSH_ERROR(INVALID_MESSAGE, "Unable to find initial '{' before end of message");
-         return INVALID_MESSAGE;
+         PUSH_ERROR(parser, JSON_INVALID_MESSAGE, -1);
+         json_errno = JSON_INVALID_MESSAGE;
+         return JSON_INVALID_MESSAGE;
       }
       
       JSONValue_t* objectValue;
       returnStatus = parseJSONObject(parser, message, messageLength, &objectValue);
-      if (returnStatus != SUCCESS){
+      if (returnStatus != JSON_SUCCESS){
          switch (returnStatus){
-            case MESSAGE_INCOMPLETE :
-               parser->lastStatus = MESSAGE_INCOMPLETE;
+            case JSON_MESSAGE_INCOMPLETE :
                parser->incompleteMessages++;
-               return MESSAGE_INCOMPLETE;
+               return JSON_MESSAGE_INCOMPLETE;
                break;
             default :
-               PUSH_ERROR(PARSER_ERROR, "Unable to parse message, see error stack for more details");
-               parser->lastStatus = PARSER_ERROR;
-               return PARSER_ERROR;
+               return returnStatus;
                break;
          }
       }
@@ -157,7 +158,21 @@ JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, ch
       while(parser->index < messageLength && message[parser->index] != '{'){
          //If we find something other then a space or '{', no more messages
          if (isgraph(message[parser->index])){
-            break;
+            if (message[parser->index] == '/' && message[parser->index + 1] == '*'){
+               //Found a comment, we need to read ahead to get past it
+               parser->index += 2;
+               while(parser->index < messageLength){
+                  if (message[parser->index++] == '*'){
+                     if (message[parser->index] == '/'){
+                        //Found end of comment
+                        break;
+                     }
+                  }
+               }
+            }
+            else {
+               break;
+            }
          }
          parser->index++;
       }
@@ -171,13 +186,14 @@ JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, ch
       
    }
    else{
-      PUSH_ERROR(PARSER_ERROR, "Parser is not in a good state, unable to parse message");
-      return PARSER_ERROR;
+      PUSH_ERROR(parser, JSON_BAD_PARSER_STATE, -1);
+      json_errno = JSON_BAD_PARSER_STATE;
+      return JSON_BAD_PARSER_STATE;
    }
    
    resetParser(parser);
    parser->messagesParsed++;
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /*-----------------------------------------------------------------
@@ -193,21 +209,22 @@ JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, ch
  * @param message - The JSON message 
  * @param size - The length of the message
  * @param result - The string that is parsed out will be put here
- * @return SUCCESS if the string was parsed correctly, error otherwise (see stack trace)
+ * @return JSON_SUCCESS if the string was parsed correctly, error otherwise (see stack trace)
  */
 static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size, char** result) {
    if (!parser){
-      PUSH_ERROR(NULL_ARGUMENT, "Not parser object was passed into the function");
-      parser->lastStatus = NULL_ARGUMENT;
-      return NULL_ARGUMENT;
+      PUSH_ERROR(parser, JSON_NULL_ARGUMENT, -1);
+      json_errno = JSON_NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
    int tempSize = 256;
    char* temp = (char*) malloc(sizeof(char) * (tempSize + 1));
    
    if(!temp){
-      PUSH_ERROR(INTERNAL_FAILURE, "Unable to allocate memory for string object");
-      return INTERNAL_FAILURE;
+      PUSH_ERROR(parser, JSON_NULL_ARGUMENT, errno);
+      json_errno = JSON_MALLOC_FAIL;
+      return JSON_MALLOC_FAIL;
    }
    
    int tempIndex = 0;
@@ -223,8 +240,9 @@ static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size
                tempSize *= 2;
                temp = (char*)realloc(temp, tempSize + 1);
                if (!temp){
-                  PUSH_ERROR(INTERNAL_FAILURE, "Unable to expand memory for string object");
-                  return INTERNAL_FAILURE;
+                  PUSH_ERROR(parser, JSON_MALLOC_FAIL, errno);
+                  json_errno = JSON_MALLOC_FAIL;
+                  return JSON_MALLOC_FAIL;
                }
                continue;   //Now that we have more memory, continue to parse the string
             }
@@ -236,8 +254,9 @@ static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size
                   temp[tempIndex++] = message[parser->index++];   //Hex
                }
                else {
-                  PUSH_ERROR(UNEXPECTED_VALUE, "Invalid Unicode escape sequence found while parsing string");
-                  return UNEXPECTED_VALUE;
+                  PUSH_ERROR(parser, JSON_INVALID_UNICODE_SEQ, -1);
+                  json_errno = JSON_INVALID_UNICODE_SEQ;
+                  return JSON_INVALID_UNICODE_SEQ;
                }
             }
             
@@ -248,8 +267,9 @@ static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size
                tempSize *= 2;
                temp = (char*)realloc(temp, tempSize + 1);
                if (!temp){
-                  PUSH_ERROR(INTERNAL_FAILURE, "Unable to expand memory for string object");
-                  return INTERNAL_FAILURE;
+                  PUSH_ERROR(parser, JSON_MALLOC_FAIL, errno);
+                  json_errno = JSON_MALLOC_FAIL;
+                  return JSON_MALLOC_FAIL;
                }
                continue;   //Now that we have more memory, continue to parse the string
             }
@@ -264,8 +284,9 @@ static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size
             tempSize *= 2;
             temp = (char*)realloc(temp, tempSize + 1);
             if (!temp){
-               PUSH_ERROR(INTERNAL_FAILURE, "Unable to expand memory for string object");
-               return INTERNAL_FAILURE;
+               PUSH_ERROR(parser, JSON_MALLOC_FAIL, errno);
+               json_errno = JSON_MALLOC_FAIL;
+               return JSON_MALLOC_FAIL;
             }
             continue;   //Now that we have more memory, continue to parse the string
          }
@@ -278,7 +299,9 @@ static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size
    
    if (parser->index >= size){
       free(temp);
-      return MESSAGE_INCOMPLETE;
+      PUSH_ERROR(parser, JSON_MESSAGE_INCOMPLETE, -1);
+      json_errno = JSON_MESSAGE_INCOMPLETE;
+      return JSON_MESSAGE_INCOMPLETE;
    }
    
    temp[tempIndex] = '\0';
@@ -293,7 +316,7 @@ static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size
    temp = (char*)realloc(temp, sizeof(char) * tempSize + 1);
    *result = temp;
    
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 /**
  * This is a helper function to parse a number from a JSON message. the 
@@ -306,7 +329,7 @@ static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size
  * @param message - The JSON message 
  * @param size - The length of the message
  * @param result - The number that is parsed out will be put here
- * @return SUCCESS if the number was parsed correctly, error otherwise (see stack trace)
+ * @return JSON_SUCCESS if the number was parsed correctly, error otherwise (see stack trace)
  */
 static JSONError_t parseJSONNumber(JSONParser_t* parser, char* message, int size, double* result){
    int tempSize = 48;
@@ -343,7 +366,9 @@ static JSONError_t parseJSONNumber(JSONParser_t* parser, char* message, int size
    }
    
    if (parser->index >= size){
-      return MESSAGE_INCOMPLETE;
+      PUSH_ERROR(parser, JSON_MESSAGE_INCOMPLETE, -1);
+      json_errno = JSON_MESSAGE_INCOMPLETE;
+      return JSON_MESSAGE_INCOMPLETE;
    }
    
    temp[tempIndex] = '\0';
@@ -353,20 +378,20 @@ static JSONError_t parseJSONNumber(JSONParser_t* parser, char* message, int size
    
    if (errno){
       if (errno == ERANGE){
-         PUSH_ERROR(NUMBER_OUT_OF_RANGE, "The number is out of range for the double type");
-         return NUMBER_OUT_OF_RANGE;
+         PUSH_ERROR(parser, JSON_NUMBER_OUT_OF_RANGE, errno);
+         json_errno = JSON_NUMBER_OUT_OF_RANGE;
+         return JSON_NUMBER_OUT_OF_RANGE;
       }
       else{
-         char error[50];
-         printf(error, "Unknown error, unable to convert number. (errno = %d)", errno);
-         PUSH_ERROR(INTERNAL_FAILURE, error);
-         return INTERNAL_FAILURE;
+         PUSH_ERROR(parser, JSON_INTERNAL_FAILURE, errno);
+         json_errno = JSON_INTERNAL_FAILURE;
+         return JSON_INTERNAL_FAILURE;
       }
       
    }
    
    *result = newNum;
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /**
@@ -377,7 +402,7 @@ static JSONError_t parseJSONNumber(JSONParser_t* parser, char* message, int size
  * @param message - The JSON message 
  * @param size - The length of the message
  * @param result - The boolean that is parsed out will be put here
- * @return SUCCESS if the boolean was parsed correctly, error otherwise (see stack trace)
+ * @return JSON_SUCCESS if the boolean was parsed correctly, error otherwise (see stack trace)
  */
 static JSONError_t parseJSONBoolean(JSONParser_t* parser, char* message, int size, bool* result){
    int tempSize = 6;
@@ -398,25 +423,26 @@ static JSONError_t parseJSONBoolean(JSONParser_t* parser, char* message, int siz
    }
    
    if (parser->index >= size){
-      return MESSAGE_INCOMPLETE;
+      PUSH_ERROR(parser, JSON_MESSAGE_INCOMPLETE, -1);
+      json_errno = JSON_MESSAGE_INCOMPLETE;
+      return JSON_MESSAGE_INCOMPLETE;
    }
    
    temp[tempIndex] = '\0';
    
    if (strcasecmp(temp, "true") == 0){
       *result = true;
-      return SUCCESS;
+      return JSON_SUCCESS;
    }
    else if (strcasecmp(temp, "false") == 0){
       *result = false;
-      return SUCCESS;
+      return JSON_SUCCESS;
    }
    else {
       //not true or false
-      char error[40];
-      sprintf(error, "found \"%s\", expected true or false", temp);
-      PUSH_ERROR(UNEXPECTED_VALUE, error);
-      return UNEXPECTED_VALUE;
+      PUSH_ERROR(parser, JSON_INVALID_VALUE, -1);
+      json_errno = JSON_INVALID_VALUE;
+      return JSON_INVALID_VALUE;
    }
    
 }
@@ -428,7 +454,7 @@ static JSONError_t parseJSONBoolean(JSONParser_t* parser, char* message, int siz
  * @param parser - The parser object that is keeping track of this specific document
  * @param message - The JSON message 
  * @param size - The length of the message
- * @return SUCCESS if the null was parsed correctly, error otherwise (see stack trace)
+ * @return JSON_SUCCESS if the null was parsed correctly, error otherwise (see stack trace)
  */
 static JSONError_t parseJSONNull(JSONParser_t* parser, char* message, int size) {
    int tempSize = 5;
@@ -450,20 +476,21 @@ static JSONError_t parseJSONNull(JSONParser_t* parser, char* message, int size) 
    }
    
    if (parser->index >= size){
-      return MESSAGE_INCOMPLETE;
+      PUSH_ERROR(parser, JSON_MESSAGE_INCOMPLETE, -1);
+      json_errno = JSON_MESSAGE_INCOMPLETE;
+      return JSON_MESSAGE_INCOMPLETE;
    }
    
    temp[tempIndex] = '\0';
    
    if (strcasecmp(temp, "null") == 0) {
-      return SUCCESS;
+      return JSON_SUCCESS;
    }
    
    else {
-      char error[35];
-      sprintf(error, "found \"%s\", expected null", temp);
-      PUSH_ERROR(UNEXPECTED_VALUE, error);
-      return UNEXPECTED_VALUE;
+      PUSH_ERROR(parser, JSON_INVALID_TYPE, -1);
+      json_errno = JSON_INVALID_VALUE;
+      return JSON_INVALID_VALUE;
    }
    
 }
@@ -478,35 +505,40 @@ static JSONError_t parseJSONNull(JSONParser_t* parser, char* message, int size) 
  * @param message - The JSON message 
  * @param size - The length of the message
  * @param result - The object that is parsed out will be put here
- * @return SUCCESS if the object was parsed correctly, error otherwise (see stack trace)
+ * @return JSON_SUCCESS if the object was parsed correctly, error otherwise (see stack trace)
  */
 static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size, JSONValue_t** result) {
    if (parser->depth >= MAX_DEPTH){
-      PUSH_ERROR(MESSAGE_TOO_LARGE, "The maximum amount of nested objects has been exceeded");
-      return MESSAGE_TOO_LARGE;
+      PUSH_ERROR(parser, JSON_MESSAGE_TOO_LARGE, -1);
+      json_errno = JSON_MESSAGE_TOO_LARGE;
+      return JSON_MESSAGE_TOO_LARGE;
    }
    
    JSONValue_t* newObj = (JSONValue_t*)calloc(1, sizeof(JSONValue_t));
    
    if (!newObj){
-      PUSH_ERROR(INTERNAL_FAILURE, "Unable to allocate memory for JSON object type");
-      return INTERNAL_FAILURE;
+      PUSH_ERROR(parser, JSON_MALLOC_FAIL, errno);
+      json_errno = JSON_MALLOC_FAIL;
+      return JSON_MALLOC_FAIL;
    }
    
    JSONError_t returnStatus;
    
    
    parser->state &= CLEAR_STATE;
-   parser->state |= (KEY | QUOTE | CLOSE_PREN | NULL_VALUE);
+   parser->state |= (KEY | QUOTE | CLOSE_PREN | CHARACTER);
    
    while(parser->index < size){
       if (isspace(message[parser->index])){
+         if (message[parser->index] == '\n'){
+            parser->lineNumber++;
+         }
          //we can ignore white space
       }
       else if (isalpha(message[parser->index])){
          //We found a boolean (should be true or false) or null, they are not quoted
          if (message[parser->index] == 'n'){
-            if (parser->state & NULL_VALUE){
+            if ((parser->state & CHARACTER) && (parser->state & KEY)){
                //Found a null (maybe)
                returnStatus = parseJSONNull(parser, message, size);
                if (!returnStatus){
@@ -516,18 +548,13 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                   parser->state |= (COMMA | CLOSE_PREN);
                }
                else {
-                  if (returnStatus == MESSAGE_INCOMPLETE){
-                     return MESSAGE_INCOMPLETE;
-                  }
-                  else {
-                     PUSH_ERROR(PARSER_ERROR, "Error while trying to parse a null object");
-                     return PARSER_ERROR;
-                  }
+                  return returnStatus;
                }
             }
             else {
-               PUSH_ERROR(UNEXPECTED_VALUE, "Found an unexpected null value");
-               return UNEXPECTED_VALUE;
+               PUSH_ERROR(parser, JSON_UNEXPECTED_VALUE, -1);
+               json_errno = JSON_UNEXPECTED_VALUE;
+               return JSON_UNEXPECTED_VALUE;
             }
          }
          else if (message[parser->index] == 't' || message[parser->index] == 'f'){
@@ -547,24 +574,20 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                   parser->state |= (COMMA | CLOSE_PREN);
                }
                else {
-                  if (returnStatus == MESSAGE_INCOMPLETE){
-                     return MESSAGE_INCOMPLETE;
-                  }
-                  else {
-                     PUSH_ERROR(PARSER_ERROR, "Parser expected a boolean, but did not find one");
-                     return PARSER_ERROR;
-                  }
+                  return returnStatus;
                }
             }
             else {
-               PUSH_ERROR(UNEXPECTED_VALUE, "Unexpected boolean value found");
-               return UNEXPECTED_VALUE;
+               PUSH_ERROR(parser, JSON_UNEXPECTED_VALUE, -1);
+               json_errno = JSON_UNEXPECTED_VALUE;
+               return JSON_UNEXPECTED_VALUE;
             }
          }
          else {
             //Found some other random character that we weren't expecting
-            PUSH_ERROR(UNEXPECTED_CHARACTER, "and unexpected character was found");
-            return UNEXPECTED_CHARACTER;
+            PUSH_ERROR(parser, JSON_UNEXPECTED_CHARACTER, -1);
+            json_errno = JSON_UNEXPECTED_CHARACTER;
+            return JSON_UNEXPECTED_CHARACTER;
          }
       }
       else if (isdigit(message[parser->index])){
@@ -584,18 +607,13 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                parser->state |= (COMMA | CLOSE_PREN);
             }
             else {
-               if (returnStatus == MESSAGE_INCOMPLETE){
-                     return MESSAGE_INCOMPLETE;
-               }
-               else {
-                  PUSH_ERROR(PARSER_ERROR, "Invalid number found while parsing JSON object");
-                  return PARSER_ERROR;
-               }
+               return returnStatus;
             }
          }
          else {
-            PUSH_ERROR(UNEXPECTED_NUMBER, "Found unexpected digit while parsing JSON object");
-            return UNEXPECTED_NUMBER;
+            PUSH_ERROR(parser, JSON_UNEXPECTED_NUMBER, -1);
+            json_errno = JSON_UNEXPECTED_NUMBER;
+            return JSON_UNEXPECTED_NUMBER;
          }
       }
       else if (ispunct(message[parser->index])){
@@ -606,13 +624,7 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                //If we are expecting a key, we will read it in and place it on the stack
                returnStatus = parseJSONKey(parser, message, size);
                if (returnStatus){
-                  if (returnStatus == MESSAGE_INCOMPLETE){
-                     return MESSAGE_INCOMPLETE;
-                  }
-                  else {
-                     PUSH_ERROR(PARSER_ERROR, "Error parsing key while parsing JSON object");
-                     return PARSER_ERROR;
-                  }
+                  return returnStatus;
                }
                
                parser->state &= CLEAR_STATE;
@@ -634,18 +646,13 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                   parser->state |= (COMMA | CLOSE_PREN);
                }
                else {
-                  if (returnStatus == MESSAGE_INCOMPLETE){
-                     return MESSAGE_INCOMPLETE;
-                  }
-                  else {
-                     PUSH_ERROR(PARSER_ERROR, "Error parsing string while parsing JSON object");
-                     return PARSER_ERROR;
-                  }
+                  return returnStatus;
                }
             }
             else {
-               PUSH_ERROR(UNEXPECTED_STRING, "An unexpected '\"' character found while parsing a JSON object");
-               return UNEXPECTED_STRING;
+               PUSH_ERROR(parser, JSON_UNEXPECTED_STRING, -1);
+               json_errno = JSON_UNEXPECTED_STRING;
+               return JSON_UNEXPECTED_STRING;
             }
          }
          else if (message[parser->index] == '{') {
@@ -667,18 +674,13 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                   parser->state |= (COMMA | CLOSE_PREN);
                }
                else {
-                  if (returnStatus == MESSAGE_INCOMPLETE){
-                     return MESSAGE_INCOMPLETE;
-                  }
-                  else {
-                     PUSH_ERROR(PARSER_ERROR, "Unable to parser JSON object");
-                     return PARSER_ERROR;
-                  }
+                  return returnStatus;
                }
             }
             else {
-               PUSH_ERROR(UNEXPECTED_OBJECT, "an unexpected '{' character found while parsing a JSON object");
-               return UNEXPECTED_OBJECT;
+               PUSH_ERROR(parser, JSON_UNEXPECTED_OBJECT, -1);
+               json_errno = JSON_UNEXPECTED_OBJECT;
+               return JSON_UNEXPECTED_OBJECT;
             }
          }
          else if (message[parser->index] == ':'){
@@ -688,8 +690,9 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                parser->state |= (VALUE | QUOTE | OPEN_PREN | OPEN_BRACKET | DIGIT | CHARACTER);
             }
             else {
-               PUSH_ERROR(UNEXPECTED_DELIMITER, "Unexpected ':' character found while parsing a JSON object");
-               return UNEXPECTED_DELIMITER;
+               PUSH_ERROR(parser, JSON_UNEXPECTED_DELIMITER, -1);
+               json_errno = JSON_UNEXPECTED_DELIMITER;
+               return JSON_UNEXPECTED_DELIMITER;
             }
          }
          else if (message[parser->index] == '['){
@@ -705,15 +708,14 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                   parser->state |= (COMMA | CLOSE_PREN);
                }
                else {
-                  if (returnStatus == MESSAGE_INCOMPLETE){
-                     return MESSAGE_INCOMPLETE;
-                  }
-                  else {
-                     PUSH_ERROR(PARSER_ERROR, "Error while parsing array object");
-                     return PARSER_ERROR;
-                  }
+                  return returnStatus;
                }
             }
+         }
+         else if (message[parser->index] == ']'){
+            PUSH_ERROR(parser, JSON_ARRAY_BRACKET_MISMATCH, -1);
+            json_errno = JSON_ARRAY_BRACKET_MISMATCH;
+            return JSON_ARRAY_BRACKET_MISMATCH;
          }
          else if (message[parser->index] == '}'){
             if (parser->state & CLOSE_PREN){
@@ -722,18 +724,20 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                break;
             }
             else {
-               PUSH_ERROR(UNEXPECTED_CHARACTER, "Unexpected '}' character found while parsing object value");
-               return UNEXPECTED_CHARACTER;
+               PUSH_ERROR(parser, JSON_OBJECT_BRACKET_MISMATCH, -1);
+               json_errno = JSON_OBJECT_BRACKET_MISMATCH;
+               return JSON_OBJECT_BRACKET_MISMATCH;
             }
          }
          else if (message[parser->index] == ','){
             if (parser->state & COMMA){
                parser->state &= CLEAR_STATE;
-               parser->state |= (KEY | QUOTE | NULL_VALUE);
+               parser->state |= (KEY | QUOTE | CHARACTER);
             }
             else {
-               PUSH_ERROR(UNEXPECTED_CHARACTER, "Unexpected ',' character found while parsing object value");
-               return UNEXPECTED_CHARACTER;
+               PUSH_ERROR(parser, JSON_UNEXPECTED_COMMA, -1);
+               json_errno = JSON_UNEXPECTED_COMMA;
+               return JSON_UNEXPECTED_COMMA;
             }
          }
       }
@@ -742,11 +746,13 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
    }
    
    if (parser->index >= size){
-      return MESSAGE_INCOMPLETE;
+      PUSH_ERROR(parser, JSON_MESSAGE_INCOMPLETE, -1);
+      json_errno = JSON_MESSAGE_INCOMPLETE;
+      return JSON_MESSAGE_INCOMPLETE;
    }
    
    *result = newObj;
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /**
@@ -758,7 +764,7 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
  * @param message - The JSON message 
  * @param size - The length of the message
  * @param result - The array that is parsed out will be put here
- * @return SUCCESS if the array was parsed correctly, error otherwise (see stack trace)
+ * @return JSON_SUCCESS if the array was parsed correctly, error otherwise (see stack trace)
  */
 static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size, JSONKeyValue_t** result){
    int arraySize = 12;
@@ -770,20 +776,24 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
    JSONKeyValue_t* array;
    
    if (!elements || !types){
-      PUSH_ERROR(INTERNAL_FAILURE, "Unable to allocate memory for JSON array object elements");
-      return INTERNAL_FAILURE;
+      PUSH_ERROR(parser, JSON_MALLOC_FAIL, errno);
+      json_errno = JSON_MALLOC_FAIL;
+      return JSON_MALLOC_FAIL;
    }
    
    parser->state &= CLEAR_STATE;
-   parser->state |= (VALUE | QUOTE | CHARACTER | DIGIT | CLOSE_BRACKET | OPEN_PREN | NULL_VALUE);
+   parser->state |= (VALUE | QUOTE | CHARACTER | DIGIT | CLOSE_BRACKET | OPEN_PREN);
    
    while(parser->index < size){
       if (isspace(message[parser->index])){
+         if (message[parser->index] == '\n'){
+            parser->lineNumber++;
+         }
          //we can ignore white space
       }
       else if (isalpha(message[parser->index])){
          if (message[parser->index] == 'n'){
-            if (parser->state & NULL_VALUE){
+            if ((parser->state & CHARACTER) && (parser->state & VALUE)){
                returnStatus = parseJSONNull(parser, message, size);
                if (!returnStatus){
                   elements[index] = NULL;
@@ -794,18 +804,13 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
                   parser->state |= (COMMA | CLOSE_BRACKET);
                }
                else {
-                  if (returnStatus == MESSAGE_INCOMPLETE){
-                     return MESSAGE_INCOMPLETE;
-                  }
-                  else {
-                     PUSH_ERROR(PARSER_ERROR, "Invalid null value found while parsing JSON array");
-                     return PARSER_ERROR;
-                  }
+                  return returnStatus;
                }
             }
             else {
-               PUSH_ERROR(UNEXPECTED_VALUE, "Found unexpected null value while parsing JSON array");
-               return UNEXPECTED_VALUE;
+               PUSH_ERROR(parser, JSON_UNEXPECTED_NULL, -1);
+               json_errno = JSON_UNEXPECTED_NULL;
+               return JSON_UNEXPECTED_NULL;
             }
          }
          else if (message[parser->index] == 't' || message[parser->index] == 'f'){
@@ -813,7 +818,7 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
             if (parser->state & VALUE && parser->state & CHARACTER){
                bool* boolVal = (bool*)malloc(sizeof(bool));
                returnStatus = parseJSONBoolean(parser, message, size, boolVal);
-               if (returnStatus == SUCCESS){
+               if (!returnStatus){
                   elements[index] = boolVal;
                   types[index] = BOOLEAN;
                   index++;
@@ -822,25 +827,19 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
                   parser->state |= (COMMA | CLOSE_BRACKET);
                }
                else {
-                  if (returnStatus == MESSAGE_INCOMPLETE){
-                     return MESSAGE_INCOMPLETE;
-                  }
-                  else {
-                     PUSH_ERROR(PARSER_ERROR, "Invalid boolean found while parsing JSON array");
-                     return PARSER_ERROR;
-                  }
+                  return returnStatus;
                }
             }
             else {
-               PUSH_ERROR(UNEXPECTED_CHARACTER, "Found unexpected boolean while parsing JSON array");
-               return UNEXPECTED_CHARACTER;
+               PUSH_ERROR(parser, JSON_UNEXPECTED_BOOLEAN, -1);
+               json_errno = JSON_UNEXPECTED_BOOLEAN;
+               return JSON_UNEXPECTED_BOOLEAN;
             }
          }
          else {
-            char error[100];
-            sprintf(error, "Found unexpected character '%c' while parsing JSON array", message[parser->index]);
-            PUSH_ERROR(UNEXPECTED_CHARACTER, error);
-            return UNEXPECTED_CHARACTER;
+            PUSH_ERROR(parser, JSON_UNEXPECTED_CHARACTER, -1);
+            json_errno = JSON_UNEXPECTED_CHARACTER;
+            return JSON_UNEXPECTED_CHARACTER;
          }
       }
       else if (isdigit(message[parser->index])) {
@@ -857,18 +856,13 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
                parser->state |= (COMMA | CLOSE_BRACKET);
             }
             else {
-               if (returnStatus == MESSAGE_INCOMPLETE){
-                     return MESSAGE_INCOMPLETE;
-               }
-               else {
-                  PUSH_ERROR(PARSER_ERROR, "Invalid number found while parsing JSON array");
-                  return PARSER_ERROR;
-               }
+               return returnStatus;
             }
          }
          else {
-            PUSH_ERROR(UNEXPECTED_NUMBER, "Found unexpected digit while parsing JSON array");
-            return UNEXPECTED_NUMBER;
+            PUSH_ERROR(parser, JSON_UNEXPECTED_NUMBER, -1);
+            json_errno = JSON_UNEXPECTED_NUMBER;
+            return JSON_UNEXPECTED_NUMBER;
          }
       }
       else if (ispunct(message[parser->index])){
@@ -887,18 +881,13 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
                   parser->state |= (COMMA | CLOSE_BRACKET);
                }
                else {
-                  if (returnStatus == MESSAGE_INCOMPLETE){
-                     return MESSAGE_INCOMPLETE;
-                  }
-                  else {
-                     PUSH_ERROR(PARSER_ERROR, "Error parsing string while parsing JSON array");
-                     return PARSER_ERROR;
-                  }
+                  return returnStatus;
                }
             }
             else {
-               PUSH_ERROR(UNEXPECTED_STRING, "An unexpected '\"' character found while parsing a JSON array");
-               return UNEXPECTED_STRING;
+               PUSH_ERROR(parser, JSON_UNEXPECTED_STRING, -1);
+               json_errno = JSON_UNEXPECTED_STRING;
+               return JSON_UNEXPECTED_STRING;
             }
          }
          else if (message[parser->index] == '{') {
@@ -917,18 +906,13 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
                   parser->state |= (COMMA | CLOSE_BRACKET);
                }
                else {
-                  if (returnStatus == MESSAGE_INCOMPLETE){
-                     return MESSAGE_INCOMPLETE;
-                  }
-                  else {
-                     PUSH_ERROR(PARSER_ERROR, "Unable to parser JSON object");
-                     return PARSER_ERROR;
-                  }
+                  return returnStatus;
                }
             }
             else {
-               PUSH_ERROR(UNEXPECTED_OBJECT, "an unexpected '{' character found while parsing a JSON object");
-               return UNEXPECTED_OBJECT;
+               PUSH_ERROR(parser, JSON_UNEXPECTED_OBJECT, -1);
+               json_errno = JSON_UNEXPECTED_OBJECT;
+               return JSON_UNEXPECTED_OBJECT;
             }
          }
          else if (message[parser->index] == '['){
@@ -951,14 +935,13 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
                   parser->state |= (COMMA | CLOSE_BRACKET);
                }
                else {
-                  if (returnStatus == MESSAGE_INCOMPLETE){
-                     return MESSAGE_INCOMPLETE;
-                  }
-                  else {
-                     PUSH_ERROR(PARSER_ERROR, "Error while parsing an enclosed array object");
-                     return PARSER_ERROR;
-                  }
+                  return returnStatus;
                }
+            }
+            else {
+               PUSH_ERROR(parser, JSON_UNEXPECTED_ARRAY, -1);
+               json_errno = JSON_UNEXPECTED_ARRAY;
+               return JSON_UNEXPECTED_ARRAY;
             }
          }
          else if (message[parser->index] == ']'){
@@ -967,23 +950,32 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
                break;
             }
             else{
-               PUSH_ERROR(UNEXPECTED_CHARACTER, "Unexpected ']' character found while parsing array");
-               return UNEXPECTED_CHARACTER;
+               PUSH_ERROR(parser, JSON_ARRAY_BRACKET_MISMATCH, -1);
+               json_errno = JSON_ARRAY_BRACKET_MISMATCH;
+               return JSON_ARRAY_BRACKET_MISMATCH;
             }
          }
          else if (message[parser->index] == ','){
-            //Found seperator, we should expect another value
-            parser->state &= CLEAR_STATE;
-            parser->state |= (VALUE | QUOTE | CHARACTER | DIGIT | OPEN_PREN | OPEN_BRACKET | NULL_VALUE);
+            if (parser->state & COMMA){
+               //Found seperator, we should expect another value
+               parser->state &= CLEAR_STATE;
+               parser->state |= (VALUE | QUOTE | CHARACTER | DIGIT | OPEN_PREN | OPEN_BRACKET);
+            }
+            else {
+               PUSH_ERROR(parser, JSON_UNEXPECTED_COMMA, -1);
+               json_errno = JSON_UNEXPECTED_COMMA;
+               return JSON_UNEXPECTED_COMMA;
+            }
+         }
+         else if (message[parser->index] == '}'){
+            PUSH_ERROR(parser, JSON_OBJECT_BRACKET_MISMATCH, -1);
+            json_errno = JSON_OBJECT_BRACKET_MISMATCH;
+            return JSON_OBJECT_BRACKET_MISMATCH;
          }
          else {
-            char error[100];
-            sprintf(error, 
-               "An unexpected character ('%c') was found while parsing the JSON array", 
-               message[parser->index]);
-            
-            PUSH_ERROR(UNEXPECTED_CHARACTER, error);
-            return UNEXPECTED_CHARACTER;
+            PUSH_ERROR(parser, JSON_UNEXPECTED_CHARACTER, -1);
+            json_errno = JSON_UNEXPECTED_CHARACTER;
+            return JSON_UNEXPECTED_CHARACTER;
          }
       }
       
@@ -993,8 +985,9 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
          types = (JSONType_t*) realloc(types, sizeof(JSONType_t) * (arraySize + 1));
          
          if (!elements || ! types){
-            PUSH_ERROR(INTERNAL_FAILURE, "Unable to allocate more space for JSON array elements");
-            return INTERNAL_FAILURE;
+            PUSH_ERROR(parser, JSON_MALLOC_FAIL, errno);
+            json_errno = JSON_MALLOC_FAIL;
+            return JSON_MALLOC_FAIL;
          }
       }
       
@@ -1002,7 +995,9 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
    }
    
    if (parser->index >= size){
-      return MESSAGE_INCOMPLETE;
+      PUSH_ERROR(parser, JSON_MESSAGE_INCOMPLETE, -1);
+      json_errno = JSON_MESSAGE_INCOMPLETE;
+      return JSON_MESSAGE_INCOMPLETE;
    }
    
    array = newJSONArray(parser->keyStack[parser->keyStackIndex - 1], elements, types, index);
@@ -1024,7 +1019,7 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
    parser->keyStackIndex--;
    
    *result= array;
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /**
@@ -1034,7 +1029,7 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
  * @param parser - The parser object that is keeping track of this specific document
  * @param message - The JSON message 
  * @param size - The length of the message
- * @return SUCCESS if the key was parsed correctly, error otherwise (see stack trace)
+ * @return JSON_SUCCESS if the key was parsed correctly, error otherwise (see stack trace)
  */
 static JSONError_t  parseJSONKey(JSONParser_t* parser, char* message, int size){
    char temp[0x100];
@@ -1071,7 +1066,7 @@ static JSONError_t  parseJSONKey(JSONParser_t* parser, char* message, int size){
                break;
                
             default:
-               return INVALID_MESSAGE;
+               return JSON_INVALID_KEY;
          }
       }
       else{
@@ -1082,7 +1077,9 @@ static JSONError_t  parseJSONKey(JSONParser_t* parser, char* message, int size){
    }
    
    if (parser->index >= size){
-      return MESSAGE_INCOMPLETE;
+      PUSH_ERROR(parser, JSON_MESSAGE_INCOMPLETE, -1);
+      json_errno = JSON_MESSAGE_INCOMPLETE;
+      return JSON_MESSAGE_INCOMPLETE;
    }
    
    temp[tempIndex] = '\0';
@@ -1090,8 +1087,9 @@ static JSONError_t  parseJSONKey(JSONParser_t* parser, char* message, int size){
    //Create a string in the free store memory to hold the key
    char* key = (char*)calloc((tempSize + 1), sizeof(char));
    if (!key){
-      PUSH_ERROR(INTERNAL_FAILURE, "Unable to allocate memeory for key");
-      return INTERNAL_FAILURE;
+      PUSH_ERROR(parser, JSON_MALLOC_FAIL, errno);
+      json_errno = JSON_MALLOC_FAIL;
+      return JSON_MALLOC_FAIL;
    }
    
    //Copy the key and push it onto the stack
@@ -1100,8 +1098,38 @@ static JSONError_t  parseJSONKey(JSONParser_t* parser, char* message, int size){
       parser->keyStack[parser->keyStackIndex++] = key;
    }
    else {
-      return MESSAGE_TOO_LARGE;
+      return JSON_MESSAGE_TOO_LARGE;
    }
    
-   return SUCCESS;
+   return JSON_SUCCESS;
+}
+
+/**
+ * Push an plain text error description onto info the parser object
+ * for which the error occurred. 
+ * 
+ * @param parser - The parser object that was running when the error occurred
+ * @param error - The error that occurred
+ * @param currentFunction - The name of the function that is currently executing
+ * @param currentFile - The name of the source file that is being executed
+ * @param description - A breif, readable description of the problem
+ */
+static void pushError(JSONParser_t* parser, JSONError_t error, const char* currentFunction, const char* currentFile, int line, int errNo){
+  if (!parser){
+     return;
+  }
+  
+  if (errNo > 0){
+     sprintf(parser->tracebackString, "%s:%s():%d %s (%s) [state = 0x%x, lineNum = %d, index = %d]", 
+             currentFile, currentFunction, line, json_strerror(error), strerror(errNo), 
+             parser->state, parser->lineNumber, parser->index);
+  }
+  else {
+     sprintf(parser->tracebackString, "%s:%s():%d %s [state = 0x%x, lineNum = %d, index = %d]", 
+             currentFile, currentFunction, line, json_strerror(error), parser->state, 
+             parser->lineNumber, parser->index);
+  }
+  
+  parser->jsonError = error;
+  parser->outsideError = errNo;
 }

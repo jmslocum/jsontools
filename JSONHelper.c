@@ -209,11 +209,11 @@ JSONKeyValue_t** getAllChildPairs(JSONKeyValue_t* parent, int* length){
  */
 JSONError_t removeChildPair(JSONKeyValue_t* parent, const char* key){
    if (!parent || !key){
-      return NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
    if (parent->type != OBJECT){
-      return INVALID_ARGUMENT;
+      return JSON_INVALID_ARGUMENT;
    }
    
    //Start looking through the list for the pair with the requested key
@@ -227,7 +227,7 @@ JSONError_t removeChildPair(JSONKeyValue_t* parent, const char* key){
             previous->next = next;
             disposeOfPair(current);
             parent->length--;
-            return SUCCESS;
+            return JSON_SUCCESS;
          }
       }
       
@@ -241,7 +241,7 @@ JSONError_t removeChildPair(JSONKeyValue_t* parent, const char* key){
       }
    }
    
-   return NO_MATCHING_PAIR;
+   return JSON_NO_MATCHING_PAIR;
 }
 
 /**
@@ -255,11 +255,11 @@ JSONError_t removeChildPair(JSONKeyValue_t* parent, const char* key){
  */
 JSONError_t removeChildPairs(JSONKeyValue_t* parent, const char* key){
    if (!parent || !key){
-      return NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
    if (parent->type != OBJECT){
-      return INVALID_ARGUMENT;
+      return JSON_INVALID_ARGUMENT;
    }
    
    //Start looking through the list for the pair with the requested key
@@ -290,10 +290,10 @@ JSONError_t removeChildPairs(JSONKeyValue_t* parent, const char* key){
    }
    
    if (found){
-      return SUCCESS;
+      return JSON_SUCCESS;
    }
    
-   return NO_MATCHING_PAIR;
+   return JSON_NO_MATCHING_PAIR;
 }
 
 /**
@@ -312,11 +312,11 @@ JSONError_t removeChildPairs(JSONKeyValue_t* parent, const char* key){
  */
 JSONError_t getArray(JSONKeyValue_t* pair, void* values[], JSONType_t types[]){
    if (!pair || !values || !types){
-      return NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
    if (pair->type != ARRAY){
-      return INVALID_ARGUMENT;
+      return JSON_INVALID_ARGUMENT;
    }
    
    JSONKeyValue_t* current = pair->value->aVal;
@@ -364,7 +364,7 @@ JSONError_t getArray(JSONKeyValue_t* pair, void* values[], JSONType_t types[]){
          }
          
          default: {
-            return INVALID_TYPE;
+            return JSON_INVALID_TYPE;
             break;
          }
       }
@@ -373,7 +373,7 @@ JSONError_t getArray(JSONKeyValue_t* pair, void* values[], JSONType_t types[]){
       current = current->next;
    }
    
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /**
@@ -388,16 +388,16 @@ JSONError_t getArray(JSONKeyValue_t* pair, void* values[], JSONType_t types[]){
  */
 JSONError_t getString(JSONKeyValue_t* pair, char** value){
    if (!pair || !value){
-      return NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
    if (pair->type != STRING){
-      return INVALID_ARGUMENT;
+      return JSON_INVALID_ARGUMENT;
    }
    
    *value = pair->value->sVal;
    
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /**
@@ -412,16 +412,16 @@ JSONError_t getString(JSONKeyValue_t* pair, char** value){
  */
 JSONError_t getNumber(JSONKeyValue_t* pair, double* value){
    if (!pair || !value){
-      return NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
    if (pair->type != NUMBER){
-      return INVALID_ARGUMENT;
+      return JSON_INVALID_ARGUMENT;
    }
    
    *value = pair->value->nVal;
    
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /**
@@ -436,16 +436,16 @@ JSONError_t getNumber(JSONKeyValue_t* pair, double* value){
  */
 JSONError_t getBoolean(JSONKeyValue_t* pair, bool* value){
    if (!pair || !value){
-      return NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
    if (pair->type != BOOLEAN){
-      return INVALID_ARGUMENT;
+      return JSON_INVALID_ARGUMENT;
    }
    
    *value = pair->value->bVal;
    
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 /**
@@ -634,7 +634,7 @@ void disposeOfPair(JSONKeyValue_t* pair){
  */
 JSONError_t convertString(const char* origional, char** convertedString){
    if (!origional || !convertedString){
-      return NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
    }
    
    int stringLength = strlen(origional);
@@ -695,7 +695,7 @@ JSONError_t convertString(const char* origional, char** convertedString){
                }
                else{
                   free(converted);
-                  return UNEXPECTED_CHARACTER;
+                  return JSON_INVALID_UNICODE_SEQ;
                }
             }
             
@@ -710,7 +710,7 @@ JSONError_t convertString(const char* origional, char** convertedString){
          }
          else {
             free(converted);
-            return UNEXPECTED_CHARACTER;
+            return JSON_UNEXPECTED_CHARACTER;
          }
       }
       else {
@@ -723,7 +723,7 @@ JSONError_t convertString(const char* origional, char** convertedString){
    //converted = (char*)realloc(converted, index + 1);
    
    *convertedString = converted;
-   return SUCCESS;
+   return JSON_SUCCESS;
 }
 
 
