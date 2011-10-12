@@ -584,6 +584,10 @@ char** getElementKeys(JSONKeyValue_t* element, int* size){
  * @param pair - the pair that was previously created
  */
 void disposeOfPair(JSONKeyValue_t* pair){
+   if (!pair){
+      return;
+   }
+   
    if (pair->type == OBJECT){
       //Objects elements must be freed so we don't get unreachable memory leaks
       JSONKeyValue_t* current = pair->value->oVal;
@@ -614,7 +618,7 @@ void disposeOfPair(JSONKeyValue_t* pair){
       free(pair->key);
    }
    
-   //Free the acctual value
+   //Free the actual value
    free(pair->value);
    free(pair);
 }
