@@ -219,7 +219,7 @@ static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size
    }
    
    int tempSize = 256;
-   char* temp = (char*) malloc(sizeof(char) * (tempSize + 1));
+   char* temp = (char*) calloc(sizeof(char), (tempSize + 1));
    
    if(!temp){
       PUSH_ERROR(parser, JSON_NULL_ARGUMENT, errno);
@@ -306,14 +306,10 @@ static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size
    
    temp[tempIndex] = '\0';
    
-   tempSize = strlen(temp);
-   
-   if (tempSize <= 0){
-      tempSize = 1;
-   }
+   tempSize = strlen(temp) + 1;
    
    //shrink the memory of the string to only what it needs
-   temp = (char*)realloc(temp, sizeof(char) * tempSize + 1);
+   temp = (char*)realloc(temp, sizeof(char) * tempSize);
    *result = temp;
    
    return JSON_SUCCESS;

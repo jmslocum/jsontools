@@ -157,12 +157,12 @@ static JSONError_t writeJSONString(JSONKeyValue_t* pair, char** output, int dept
       if (pair->key && pair->value && pair->value->sVal){
          keyLen = strlen(pair->key);
          valLen = strlen(pair->value->sVal);
-         *output = (char*) malloc(sizeof(char) * (keyLen + valLen + otherStuff));
+         *output = (char*) calloc(sizeof(char), (keyLen + valLen + otherStuff));
          strLen = sprintf(*output, "%s\"%s\" : \"%s\"", ind, pair->key, pair->value->sVal);
       }
       else if (pair->value && pair->value->sVal){
          valLen = strlen(pair->value->sVal);
-         *output = (char*) malloc(sizeof(char) * (valLen + otherStuff));
+         *output = (char*) calloc(sizeof(char), (valLen + otherStuff));
          strLen = sprintf(*output, "%s\"%s\"", ind, pair->value->sVal);
       }
       else{
@@ -229,7 +229,7 @@ static JSONError_t writeJSONNumber(JSONKeyValue_t* pair, char** output, int dept
       
       if (pair->key && pair->value){
          keyLen = strlen(pair->key);
-         *output = (char*) malloc(sizeof(char) * (keyLen + valLen + otherStuff));
+         *output = (char*) calloc(sizeof(char), (keyLen + valLen + otherStuff));
          if (hasFractional){
             strLen = sprintf(*output, "%s\"%s\" : %f", ind, pair->key, pair->value->nVal);
          }
@@ -239,7 +239,7 @@ static JSONError_t writeJSONNumber(JSONKeyValue_t* pair, char** output, int dept
          
       }
       else if (pair->value){
-         *output = (char*) malloc(sizeof(char) * (valLen + otherStuff));
+         *output = (char*) calloc(sizeof(char), (valLen + otherStuff));
          if (hasFractional){
             strLen = sprintf(*output, "%s%f", ind,  pair->value->nVal);
          }
@@ -301,12 +301,12 @@ static JSONError_t writeJSONBoolean(JSONKeyValue_t* pair, char** output, int dep
       if (pair->key && pair->value){
          keyLen = strlen(pair->key);
          valLen = ((pair->value->bVal) ? strlen(t) : strlen(f));
-         *output = (char*) malloc(sizeof(char) * (keyLen + valLen + otherStuff));
+         *output = (char*) calloc(sizeof(char), (keyLen + valLen + otherStuff));
          strLen = sprintf(*output, "%s\"%s\" : %s", ind, pair->key, ((pair->value->bVal) ? t : f));
       }
       else if (pair->value){
          valLen = ((pair->value->bVal) ? strlen(t) : strlen(f));
-         *output = (char*) malloc(sizeof(char) * (valLen + otherStuff));
+         *output = (char*) calloc(sizeof(char), (valLen + otherStuff));
          strLen = sprintf(*output, "%s%s", ind, ((pair->value->bVal) ? t : f));
       }
       else {
@@ -420,7 +420,7 @@ static JSONError_t writeJSONObject(JSONKeyValue_t* pair, char** output, int dept
          otherStuff += 3;     //null char + comma + newline
       }
       
-      *output = (char*) malloc(sizeof(char) * (keyLen + valLen + otherStuff));
+      *output = (char*) calloc(sizeof(char), (keyLen + valLen + otherStuff));
       
       if (pair->key){
          sprintf(*output, "%s\"%s\" : {\n", ind, pair->key);
@@ -542,7 +542,7 @@ static JSONError_t writeJSONArray(JSONKeyValue_t* pair, char** output, int depth
          otherStuff += 3;  //null char, comma, newline
       }
       
-      *output = (char*) malloc(sizeof(char) * (keyLen + valLen + otherStuff));
+      *output = (char*) calloc(sizeof(char), (keyLen + valLen + otherStuff));
       
       if (pair->key){
          sprintf(*output, "%s\"%s\" : [\n", ind, pair->key);
@@ -556,7 +556,10 @@ static JSONError_t writeJSONArray(JSONKeyValue_t* pair, char** output, int depth
          strcat(*output, ",\n");
       }
       
-      strcat(*output, values[pair->length - 1]);
+      if (pair->length > 0){
+         strcat(*output, values[pair->length - 1]);
+      }
+      
       strcat(*output, "\n");
       strcat(*output, ind);
       strcat(*output, "]");
@@ -604,7 +607,7 @@ static JSONError_t writeJSONNull(JSONKeyValue_t* pair, char** output, int depth,
       int strLen = 0;
       char* ind = indent(depth); //The indent string (this is dynamic so we need to free it)
       
-      *output = (char*) malloc(sizeof(char) * (valLen + otherStuff));
+      *output = (char*) calloc(sizeof(char), (valLen + otherStuff));
       
       strLen = sprintf(*output, "%s%s", ind, "null");
       
