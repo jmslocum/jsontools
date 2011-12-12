@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <stdbool.h>
 #include <ctype.h>
 #include <errno.h>
@@ -426,11 +425,11 @@ static JSONError_t parseJSONBoolean(JSONParser_t* parser, char* message, int siz
    
    temp[tempIndex] = '\0';
    
-   if (strcasecmp(temp, "true") == 0){
+   if (strcmp(temp, "true") == 0){
       *result = true;
       return JSON_SUCCESS;
    }
-   else if (strcasecmp(temp, "false") == 0){
+   else if (strcmp(temp, "false") == 0){
       *result = false;
       return JSON_SUCCESS;
    }
@@ -479,7 +478,7 @@ static JSONError_t parseJSONNull(JSONParser_t* parser, char* message, int size) 
    
    temp[tempIndex] = '\0';
    
-   if (strcasecmp(temp, "null") == 0) {
+   if (strcmp(temp, "null") == 0) {
       return JSON_SUCCESS;
    }
    
