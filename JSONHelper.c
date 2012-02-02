@@ -5,20 +5,10 @@
 
 #include "JSONTools.h"
 
-/**
- * Helper function that converts an integer (unicode character) to
- * a sequence of unicode bytes. The bytes can then be written into
- * a string and displayed on a UTF-8 compatable terminal or file 
- * reader. 
- * 
- * @param character - The unicode character (up to 16 bits wide is what JSON allows)
- * 
- * @param utfBytes - an array of size 6, this array will be filled with UTF-8 bytes
- * 
- * @return - Number of bytes in utfBytes array.
- * 
- * NOTE - Always pass a char array of size 6 into the functon to avoid segfaulting
- */
+/*-----------------------------------------------------------------
+ * Declare private static functions
+ *---------------------------------------------------------------*/
+
 static int convertToUTF8(unsigned int character, char utfBytes[]);
 
 /*------------------------------------------------------------------
@@ -181,6 +171,37 @@ JSONKeyValue_t** getAllChildPairs(JSONKeyValue_t* parent, int* length){
    JSONKeyValue_t** pairs = (JSONKeyValue_t**) malloc(sizeof(JSONKeyValue_t*) * parent->length);
    current = parent->value->oVal;
    while(current != NULL){
+      pairs[index] = current;
+   
+      current = current->next;
+      index++;
+   }
+   
+   *length = parent->length;
+   return pairs;
+}
+
+JSONKeyValue_t** getAllChildrenFromObject(JSONValue_t* obj, int* length){
+   if (!obj || !length){
+      return NULL;
+   }
+   
+   if (!obj->oVal){
+      *length = -1;
+      return NULL;
+   }
+   
+   //Find out how many elements are under this object
+   JSONKeyValue_t* current = obj->oVal;
+   int count = 0;
+   for (count = 0; current != NULL; current = current->next, count++);
+   
+   JSONKeyValue_t** pairs = (JSONKeyValue_t**) malloc(sizeof(JSONKeyValue_t*) * count);
+   //Loop through the linked list of JSON values and add them to the array
+   int index = 0;
+   current = obj->oVal;
+   
+   while(current != NULL){
       if (current->type == NIL) {
          pairs[index] = NULL;
       }
@@ -192,7 +213,7 @@ JSONKeyValue_t** getAllChildPairs(JSONKeyValue_t* parent, int* length){
       index++;
    }
    
-   *length = parent->length;
+   *length = count;
    return pairs;
 }
 
@@ -728,7 +749,24 @@ JSONError_t convertString(const char* origional, char** convertedString){
    return JSON_SUCCESS;
 }
 
+/*--------------------------------------------------------------------
+ * Implement private static functions
+ *------------------------------------------------------------------*/
 
+/**
+ * Helper function that converts an integer (unicode character) to
+ * a sequence of unicode bytes. The bytes can then be written into
+ * a string and displayed on a UTF-8 compatable terminal or file 
+ * reader. 
+ * 
+ * @param character - The unicode character (up to 16 bits wide is what JSON allows)
+ * 
+ * @param utfBytes - an array of size 6, this array will be filled with UTF-8 bytes
+ * 
+ * @return - Number of bytes in utfBytes array.
+ * 
+ * NOTE - Always pass a char array of size 6 into the functon to avoid segfaulting
+ */
 static int convertToUTF8(unsigned int character, char utfBytes[]){
    if (!utfBytes){
       return -1;

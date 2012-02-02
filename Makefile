@@ -4,10 +4,9 @@ FLAGS=-Iinclude/ --std=c99 -ggdb -Wall
 		
 staticlib: $(OBJS)
 		ar -cr libjsontools.a $(OBJS)
-		mv libjsontools.a ../lib
 
 all: test.c staticlib
-		gcc $(FLAGS) test.c -L ../lib -ljsontools -o JSONTest
+		gcc $(FLAGS) test.c -L . -ljsontools -o JSONTest
 		mv JSONTest ../bin
 
 JSONParser.o: JSONParser.c

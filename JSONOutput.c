@@ -601,14 +601,19 @@ static JSONError_t writeJSONNull(JSONKeyValue_t* pair, char** output, int depth,
       
       //We will need to calculate exactly how much room in memeory is need
       //to make this pair into a string value. 
-      int valLen = 5;   //The word null
+      int valLen = 5 + (pair->key ? strlen(pair->key) : 0);   //The word null plus the key
       int otherStuff = (2 * depth) + 1;    //Other string formatting stuff
       int strLen = 0;
       char* ind = indent(depth); //The indent string (this is dynamic so we need to free it)
       
       *output = (char*) calloc(sizeof(char), (valLen + otherStuff));
       
-      strLen = sprintf(*output, "%s%s", ind, "null");
+      if (pair->key){
+         strLen = sprintf(*output, "%s\"%s\":%s", ind, pair->key, "null");
+      }
+      else {
+         strLen = sprintf(*output, "%s%s", ind, "null");
+      }
       
       *output = (char*) realloc(*output, strLen + 1);
       *length = strLen;

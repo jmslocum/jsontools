@@ -14,6 +14,7 @@ bool hasChildPair(JSONKeyValue_t* parent, const char* key);
 JSONKeyValue_t* getChildPair(JSONKeyValue_t* parent, const char* key);
 JSONKeyValue_t** getChildPairs(JSONKeyValue_t* parent, const char* key, int* length);
 JSONKeyValue_t** getAllChildPairs(JSONKeyValue_t* parent, int* length);
+JSONKeyValue_t** getAllChildrenFromObject(JSONValue_t* obj, int* length);
 JSONError_t removeChildPair(JSONKeyValue_t* parent, const char* key);
 JSONError_t removeChildPairs(JSONKeyValue_t* parent, const char* key);
 JSONError_t getArray(JSONKeyValue_t* pair, void* values[], JSONType_t types[]);

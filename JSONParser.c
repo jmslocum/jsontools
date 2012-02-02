@@ -533,11 +533,16 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
       else if (isalpha(message[parser->index])){
          //We found a boolean (should be true or false) or null, they are not quoted
          if (message[parser->index] == 'n'){
-            if ((parser->state & CHARACTER) && (parser->state & KEY)){
+            if ((parser->state & CHARACTER) && (parser->state & VALUE)){
                //Found a null (maybe)
                returnStatus = parseJSONNull(parser, message, size);
                if (!returnStatus){
-                  addKeyValuePair(newObj, newJSONPair(NIL, NULL, NULL));
+                  JSONKeyValue_t* newPair = newJSONPair(NIL, parser->keyStack[parser->keyStackIndex - 1], NULL);
+                  addKeyValuePair(newObj, newPair);
+                  free(newPair);
+                  parser->keyStackIndex--;
+                  free(parser->keyStack[parser->keyStackIndex]);
+                  parser->keyStack[parser->keyStackIndex] = NULL;
                   
                   parser->state &= CLEAR_STATE;
                   parser->state |= (COMMA | CLOSE_PREN);

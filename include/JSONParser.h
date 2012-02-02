@@ -56,7 +56,6 @@ typedef struct {
    
    //Some basic statistics
    int messagesParsed;        /**< How many messages have been parsed with this parser */
-   int keyValuesParsed;       /**< How many key:value pairs have been parsed */
    int incompleteMessages;    /**< How many incomplete messages were resumed */
    
    //Some debugging info
