@@ -22,10 +22,9 @@
  * can detect syntax errors in the JSON message.
  */
 typedef enum {
-   NEW =             0x00000001, /**< A brand new parser */
-   KEY =             0x00000002, /**< Looking for a key (Quoted string) */
-   DELIMITER =       0x00000004, /**< Looking for ':' character */
-   VALUE =           0x00000008, /**< Looking for a JSON value */
+   KEY =             0x00000001, /**< Looking for a key (Quoted string) */
+   DELIMITER =       0x00000002, /**< Looking for ':' character */
+   VALUE =           0x00000004, /**< Looking for a JSON value */
    
    DIGIT =           0x00000100, /**< Looking for first digit of JSON number */
    QUOTE =           0x00000200, /**< Looking for quote to signify a string value */

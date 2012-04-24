@@ -54,7 +54,17 @@ JSONError_t documentToString(JSONKeyValue_t* document, char** output, int* lengt
    int index = 0;
    
    JSONError_t status;
-   JSONKeyValue_t* currentElement = document->value->oVal;
+   JSONKeyValue_t* currentElement = NULL;
+   if (document->type == OBJECT) {
+      currentElement = document->value->oVal;
+   }
+   else if (document->type == ARRAY){
+      currentElement = document->value->aVal;
+   }
+   else {
+      return JSON_INVALID_VALUE;
+   }
+   
    int tempLength = 0;
    
    
@@ -98,7 +108,12 @@ JSONError_t documentToString(JSONKeyValue_t* document, char** output, int* lengt
    }
    
    *output = (char*) malloc(sizeof(char) * (valLen + otherStuff));
-   sprintf(*output, "{\n");
+   if (document->type == OBJECT) {
+      sprintf(*output, "{\n");
+   }
+   else if (document->type == ARRAY){
+      sprintf(*output, "[\n");
+   }
    
    for (int i = 0; i < document->length - 1; i++){
       strcat(*output, values[i]);
@@ -109,7 +124,13 @@ JSONError_t documentToString(JSONKeyValue_t* document, char** output, int* lengt
       strcat(*output, values[document->length - 1]);
       strcat(*output, "\n");
    }
-   strcat(*output, "}\n");
+   
+   if (document->type == OBJECT){
+      strcat(*output, "}\n");
+   }
+   else if (document->type == ARRAY){
+      strcat(*output, "]\n");
+   }
    
    strLen = strlen(*output);
    *output = (char*) realloc(*output, strLen + 1);

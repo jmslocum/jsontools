@@ -40,8 +40,8 @@ JSONParser_t* newJSONParser(){
    
    memset(newParser, 0, sizeof(JSONParser_t));
    
-   //The first thing a new parser should see is a '{' character
-   newParser->state = (NEW);  
+   //Set the parser to look for the beginning of a JSON message
+   newParser->state = (OPEN_PREN || OPEN_BRACKET);  
          
    return newParser;
 }
@@ -60,7 +60,7 @@ void resetParser(JSONParser_t* parser){
    }
    
    parser->index = 0;
-   parser->state = NEW;
+   parser->state = (OPEN_PREN || OPEN_BRACKET);
    parser->lineNumber = 0;
    parser->depth = 0;
    parser->keyStackIndex = 0;
@@ -74,7 +74,9 @@ void resetParser(JSONParser_t* parser){
 
 /**
  * Builds the document model for the specific JSON message that has 
- * come in. 
+ * come in. A message can be an Object '{ pairs }'. An Array '[ ... ]'
+ * This will parse out the whole document and put a pointer
+ * to the document in JSONKeyValue_t** document.
  * 
  * @param parser - The parser object that will be used to track the progress
  *    of parsing process
@@ -84,9 +86,8 @@ void resetParser(JSONParser_t* parser){
  *    function has returned, if the document is not null, it's contents
  *    will be freed and a new document will be built.
  * 
- * @param message - the JSON message that you want to parse, a length is not
- *    necessary since it will parse up until the last '}' char, or '\0' 
- *    character. 
+ * @param message - the JSON message that you want to parse, The message MUST
+ *    be null terminated.
  * 
  * @return JSON_SUCCESS if the message was parsed correctly, an error otherwise.
  */
@@ -101,40 +102,62 @@ JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, ch
    parser->index = 0;
    JSONError_t returnStatus;
    
-   if (parser->state & NEW){
-      //Seek forward to first '{' symbol
-      while(parser->index < messageLength && message[parser->index] != '{'){
-         //If we find something other then a space or '{', we have a problem
-         if (isgraph(message[parser->index++])){
-            if (message[parser->index - 1] == '/' && message[parser->index] == '*'){
-               //Found a comment, we need to read ahead to get past it
-               parser->index++;
-               while(parser->index < messageLength){
-                  if (message[parser->index++] == '*'){
-                     if (message[parser->index++] == '/'){
-                        //Found end of comment
-                        break;
-                     }
+   //Seek forward to first character in the message
+   while(parser->index < messageLength){
+      if (isgraph(message[parser->index])){
+         parser->index++;
+         if (message[parser->index - 1] == '/' && message[parser->index] == '*'){
+            //Found a comment, we need to read ahead to get past it
+            parser->index++;
+            while(parser->index < messageLength){
+               if (message[parser->index] == '*'){
+                  parser->index++;
+                  if (message[parser->index] == '/' && parser->index < messageLength){
+                     //Found end of comment
+                     parser->index++;
+                     break;
                   }
                }
-            }
-            else {
-               PUSH_ERROR(parser, JSON_INVALID_MESSAGE, -1);
-               json_errno = JSON_INVALID_MESSAGE;
-               return JSON_INVALID_MESSAGE;
+               else if (message[parser->index] == '\n'){
+                  parser->index++;
+                  parser->lineNumber++;
+               }
+               else {
+                  parser->index++;
+               }
             }
          }
+         else if (message[parser->index - 1] == '/' && message[parser->index] == '/'){
+            //Found a single line comment, parse until end of line
+            while(parser->index < messageLength && message[parser->index++] != '\n');
+            parser->lineNumber++;
+         }
+         else {
+            //We found the first character in the message
+            //rewind index to point to that character
+            parser->index--;
+            break;
+         }
       }
-      
-      parser->index++;  //move past the '{' character
-      
-      //If we never found the '{' and ran out of message
-      if (parser->index >= messageLength){
-         PUSH_ERROR(parser, JSON_INVALID_MESSAGE, -1);
-         json_errno = JSON_INVALID_MESSAGE;
-         return JSON_INVALID_MESSAGE;
+      else if (message[parser->index] == '\n') {
+         parser->index++;
+         parser->lineNumber++;
       }
-      
+   }
+   
+   //If we never found the first character and ran out of message
+   if (parser->index >= messageLength){
+      PUSH_ERROR(parser, JSON_INVALID_MESSAGE, -1);
+      json_errno = JSON_INVALID_MESSAGE;
+      return JSON_INVALID_MESSAGE;
+   }
+   
+   //Check what kind of character it is. It can either be an
+   //Array or an Object
+   
+   if (message[parser->index] == '{'){
+      //Found an object
+      parser->index++;
       JSONValue_t* objectValue;
       returnStatus = parseJSONObject(parser, message, messageLength, &objectValue);
       if (returnStatus != JSON_SUCCESS){
@@ -148,46 +171,59 @@ JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, ch
                break;
          }
       }
-      
+      //Attach the object as the final json document
       *document = newJSONPair(OBJECT, NULL, objectValue);
-      
-      //Look forward down the message to see if another JOSN message starts
-      //if it does, report the index of that message in lastIndex
-      parser->index++;  //Step past last '}' character
-      while(parser->index < messageLength && message[parser->index] != '{'){
-         //If we find something other then a space or '{', no more messages
-         if (isgraph(message[parser->index])){
-            if (message[parser->index] == '/' && message[parser->index + 1] == '*'){
-               //Found a comment, we need to read ahead to get past it
-               parser->index += 2;
-               while(parser->index < messageLength){
-                  if (message[parser->index++] == '*'){
-                     if (message[parser->index] == '/'){
-                        //Found end of comment
-                        break;
-                     }
+   }
+   else if (message[parser->index] == '['){
+      //Found an array
+      parser->index++;
+      JSONKeyValue_t* arrayValue;
+      returnStatus = parseJSONArray(parser, message, messageLength, &arrayValue);
+      if (returnStatus != JSON_SUCCESS){
+         switch (returnStatus){
+            case JSON_MESSAGE_INCOMPLETE :
+               parser->incompleteMessages++;
+               return JSON_MESSAGE_INCOMPLETE;
+               break;
+            default :
+               return returnStatus;
+               break;
+         }
+      }
+      //Attach the array as the final json document
+      *document = arrayValue;
+   }
+   
+   //Look forward down the message to see if another JOSN message starts
+   //if it does, report the index of that message in lastIndex
+   parser->index++;  //Step past last '}' character
+   while(parser->index < messageLength && message[parser->index] != '{' && message[parser->index] != '['){
+      //If we find something other then a space or '{', no more messages
+      if (isgraph(message[parser->index])){
+         if (message[parser->index] == '/' && message[parser->index + 1] == '*'){
+            //Found a comment, we need to read ahead to get past it
+            parser->index += 2;
+            while(parser->index < messageLength){
+               if (message[parser->index++] == '*'){
+                  if (message[parser->index] == '/'){
+                     //Found end of comment
+                     break;
                   }
                }
             }
-            else {
-               break;
-            }
          }
-         parser->index++;
+         else {
+            break;
+         }
       }
-      
-      if (message[parser->index] == '{'){
-         *lastIndex = parser->index;
-      }
-      else {
-         *lastIndex = -1;
-      }
-      
+      parser->index++;
    }
-   else{
-      PUSH_ERROR(parser, JSON_BAD_PARSER_STATE, -1);
-      json_errno = JSON_BAD_PARSER_STATE;
-      return JSON_BAD_PARSER_STATE;
+   
+   if (message[parser->index] == '{' || message[parser->index] == '['){
+      *lastIndex = parser->index;
+   }
+   else {
+      *lastIndex = -1;
    }
    
    resetParser(parser);
@@ -702,8 +738,13 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                JSONKeyValue_t* arrVal;
                returnStatus = parseJSONArray(parser, message, size, &arrVal);
                if (!returnStatus){
+                  arrVal->key = calloc(strlen(parser->keyStack[parser->keyStackIndex - 1]), sizeof(char));
+                  strcpy(arrVal->key, parser->keyStack[parser->keyStackIndex - 1]);
                   addKeyValuePair(newObj, arrVal);
                   free(arrVal);
+                  parser->keyStackIndex--;
+                  free(parser->keyStack[parser->keyStackIndex]);
+                  parser->keyStack[parser->keyStackIndex] = NULL;
                   parser->state &= CLEAR_STATE;
                   parser->state |= (COMMA | CLOSE_PREN);
                }
@@ -918,11 +959,6 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
          else if (message[parser->index] == '['){
             //Found the beginning of an array
             if ((parser->state & VALUE) && (parser->state & OPEN_BRACKET)){
-               //Arrays create key-value pairs, but this array is a value of another array
-               //we need to push a null key onto the stack for this array
-               parser->keyStack[parser->keyStackIndex] = NULL;
-               parser->keyStackIndex++;
-
                parser->index++;
                JSONKeyValue_t* arrVal;
                returnStatus = parseJSONArray(parser, message, size, &arrVal);
@@ -1000,9 +1036,9 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
       return JSON_MESSAGE_INCOMPLETE;
    }
    
-   array = newJSONArray(parser->keyStack[parser->keyStackIndex - 1], elements, types, index);
+   array = newJSONArray(elements, types, index);
    
-   //Need to free the booleans, and numbers, and strings
+   //Need to free the booleans, numbers, and strings
    for (int i = 0; i < array->length; i++){
       if (types[i] == NUMBER || types[i] == BOOLEAN || types[i] == STRING){
          free(elements[i]);
@@ -1011,12 +1047,6 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
    
    free(elements);
    free(types);
-   
-   if (parser->keyStack[parser->keyStackIndex - 1]){
-      free(parser->keyStack[parser->keyStackIndex - 1]);
-   }
-   parser->keyStack[parser->keyStackIndex - 1] = NULL;
-   parser->keyStackIndex--;
    
    *result= array;
    return JSON_SUCCESS;

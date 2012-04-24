@@ -240,8 +240,6 @@ JSONValue_t* addKeyValuePair(JSONValue_t* object, JSONKeyValue_t* pair){
  * Creates a new JSON array object. The contents of the the array are built 
  * into the JSON Array object and returned as a value object.
  * 
- * @param key - The unique identifier for the key:value pair
- * 
  * @param array - The actual values that will be put into the array
  * 
  * @param types - The corresponding types for the values
@@ -250,7 +248,7 @@ JSONValue_t* addKeyValuePair(JSONValue_t* object, JSONKeyValue_t* pair){
  * 
  * @return The JSON key:value pair with the values inside of the array
  */
-JSONKeyValue_t* newJSONArray(char* key, void* array[], JSONType_t types[], int length) {
+JSONKeyValue_t* newJSONArray(void* array[], JSONType_t types[], int length) {
    JSONKeyValue_t* newArray = (JSONKeyValue_t*) malloc(sizeof(JSONKeyValue_t));
    JSONValue_t* arrayValue = (JSONValue_t*) malloc(sizeof(JSONValue_t));
    
@@ -319,16 +317,6 @@ JSONKeyValue_t* newJSONArray(char* key, void* array[], JSONType_t types[], int l
       }
    }
    
-   if (key){
-      int keyLength = strlen(key);
-      newArray->key = (char*) malloc(sizeof(char) * (keyLength + 1));
-      if (newArray->key == NULL){
-         return NULL;
-      }
-      
-      strcpy(newArray->key, key);
-   }
-   
    newArray->length = length;
    newArray->type = ARRAY;
    
@@ -355,16 +343,6 @@ JSONKeyValue_t* newJSONPair(JSONType_t type, char* key, JSONValue_t* value) {
    
    memset(newPair, 0, sizeof(JSONKeyValue_t));
    
-    if (key){
-      int keyLength = strlen(key);
-      newPair->key = (char*) malloc(sizeof(char) * (keyLength + 1));
-      if (newPair->key == NULL){
-         return NULL;
-      }
-      
-      strcpy(newPair->key, key);
-   }
-   
    int count = 0;
    if (type == OBJECT){
       JSONKeyValue_t* current = value->oVal;
@@ -380,6 +358,10 @@ JSONKeyValue_t* newJSONPair(JSONType_t type, char* key, JSONValue_t* value) {
    newPair->type = type;
    newPair->value = value;
    newPair->length = count;
+   if (key){
+      newPair->key = calloc(strlen(key), sizeof(char));
+      strcpy(newPair->key, key);
+   }
    
    return newPair;
 }
