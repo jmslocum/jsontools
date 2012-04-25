@@ -192,8 +192,6 @@ static JSONError_t writeJSONString(JSONKeyValue_t* pair, char** output, int dept
       
       free(ind);
       
-      //Shrink string down to exact size
-      *output = (char*) realloc(*output, (sizeof(char) * (strLen + 1)));
       *length = strLen;
       
    }
@@ -277,8 +275,6 @@ static JSONError_t writeJSONNumber(JSONKeyValue_t* pair, char** output, int dept
          return JSON_INTERNAL_FAILURE;
       }
       
-      //Shrink string down to exact size
-      *output = (char*) realloc(*output, sizeof(char) * (strLen + 1));
       *length = strLen;
       free(ind);
    }
@@ -333,8 +329,6 @@ static JSONError_t writeJSONBoolean(JSONKeyValue_t* pair, char** output, int dep
          return JSON_NULL_VALUE;
       }
       
-      //Shrink string down to exact size
-      *output = (char*) realloc(*output, sizeof(char) * (strLen + 1));
       *length = strLen;
       free(ind);
    }
@@ -636,7 +630,6 @@ static JSONError_t writeJSONNull(JSONKeyValue_t* pair, char** output, int depth,
          strLen = sprintf(*output, "%s%s", ind, "null");
       }
       
-      *output = (char*) realloc(*output, strLen + 1);
       *length = strLen;
       free(ind);
    }
