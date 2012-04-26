@@ -99,6 +99,11 @@ JSONError_t documentToString(JSONKeyValue_t* document, char** output, int* lengt
             return JSON_INVALID_TYPE;
       }
       
+      if (status != JSON_SUCCESS){
+         json_errno = status;
+         return status;
+      }
+      
       currentElement = currentElement->next;
    }
    
