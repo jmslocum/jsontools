@@ -738,7 +738,7 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
                JSONKeyValue_t* arrVal;
                returnStatus = parseJSONArray(parser, message, size, &arrVal);
                if (!returnStatus){
-                  arrVal->key = calloc(strlen(parser->keyStack[parser->keyStackIndex - 1]), sizeof(char));
+                  arrVal->key = calloc(strlen(parser->keyStack[parser->keyStackIndex - 1]) + 1, sizeof(char));
                   strcpy(arrVal->key, parser->keyStack[parser->keyStackIndex - 1]);
                   addKeyValuePair(newObj, arrVal);
                   free(arrVal);

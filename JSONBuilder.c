@@ -359,7 +359,7 @@ JSONKeyValue_t* newJSONPair(JSONType_t type, char* key, JSONValue_t* value) {
    newPair->value = value;
    newPair->length = count;
    if (key){
-      newPair->key = calloc(strlen(key), sizeof(char));
+      newPair->key = calloc(strlen(key) + 1, sizeof(char));
       strcpy(newPair->key, key);
    }
    
