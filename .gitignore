@@ -1,3 +1,4 @@
 *.o
 libjsontools.a
-
+*.swp
+jsontools
