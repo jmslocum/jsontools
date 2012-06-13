@@ -70,6 +70,5 @@ int main(int argc, char **argv)
    } while(status == JSON_SUCCESS && lastIndex > 0);
    
    free(parser);
-	
-	return 0;
+   return 0;
 }
