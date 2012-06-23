@@ -2,12 +2,11 @@ SWITCH= -DTOOLSTEST
 OBJS= JSONError.o JSONHelper.o JSONBuilder.o JSONOutput.o JSONParser.o
 FLAGS=-Iinclude/ --std=c99 -ggdb -Wall
 		
+all: jsontools.c version.h staticlib
+		gcc $(FLAGS) jsontools.c -L . -ljsontools -o jsontools
+
 staticlib: $(OBJS)
 		ar -cr libjsontools.a $(OBJS)
-
-all: test.c staticlib
-		gcc $(FLAGS) test.c -L . -ljsontools -o JSONTest
-		mv JSONTest ../bin
 
 JSONParser.o: JSONParser.c
 		gcc -c $(FLAGS) JSONParser.c -o JSONParser.o
@@ -24,13 +23,21 @@ JSONError.o: JSONError.c
 JSONHelper.o: JSONHelper.c
 		gcc -c $(FLAGS) JSONHelper.c -o JSONHelper.o
 
+version.h: version.txt
+		echo "#define VERSION \"$(shell cat version.txt)\"" > version.h
+		echo "#define REVISION \"$(shell git log -1 | grep commit | cut -d " " -f 2)\"" >> version.h
+
+install:
+		cp libjsontools.a /usr/local/lib
+		mkdir -p /usr/local/include/JSONTools
+		cp include/*.h /usr/local/include/JSONTools
+		cp jsontools /usr/local/bin
+
 clean:
 		rm -rf *.o
+		rm -rf libjsontools.a
+		rm -rf jsontools
+		rm -rf version.h
 		
-spotless: 
-		-rm -rf *.o
-		-rm ../bin/JSONTest
-		-rm ../lib/*.a
-
-.PHONY: clean spotless
+.PHONY: clean install
 
