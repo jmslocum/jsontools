@@ -38,7 +38,9 @@ make clean
 ```
 
 libjsontools.a installs to /usr/local/lib
+
 the headers are installed to /usr/local/include/JSONTools
+
 jsontools installs to /usr/local/bin
 
 ## Reporting issues
