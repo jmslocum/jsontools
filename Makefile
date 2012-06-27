@@ -1,6 +1,8 @@
 SWITCH= -DTOOLSTEST
 OBJS= JSONError.o JSONHelper.o JSONBuilder.o JSONOutput.o JSONParser.o
-FLAGS=-Iinclude/ --std=c99 -ggdb -Wall
+FLAGS=-Iinclude/ --std=c99 -Wall
+#FLAGS += -ggdb
+FLAGS += -O3
 		
 all: jsontools.c version.h staticlib
 		gcc $(FLAGS) jsontools.c -L . -ljsontools -o jsontools
