@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <getopt.h>
-#include <unistd.h>
 #include <stdint.h>
 #include <stdbool.h>
+
+#include <getopt.h>
+#include <unistd.h>
+#include <syslog.h>
 
 #include "version.h"
 #include "JSONTools.h"
@@ -12,6 +14,7 @@
 static bool version = false;
 static bool help = false;
 static bool verify = false;
+static bool standardin = false;
 
 static struct option longOptions[] = {
   {"help",    no_argument,    NULL,   'h'},
@@ -33,13 +36,100 @@ static const char* shortOptions = "hvr";
 static void usageAndExit(FILE* term, char* programName, int exitCode){
   if (!term) term = stdout;
   fprintf(term, "%s usage: \n", programName);
-  fprintf(term, "\t%s [options] file1 file2 ... fileN\n", programName);
+  fprintf(term, "\t%s [options] [files]\n", programName);
   fprintf(term, "options:\n");
   fprintf(term, "\t-h  --help    Print this messsage\n");
   fprintf(term, "\t-v  --version Print the version number\n");
   fprintf(term, "\t-r  --verify  only a 0 or 1 return value\n");
   fprintf(term, "\t              0 = good json, positive number = bad\n");
   exit(exitCode);
+}
+
+/**
+  This function is a custom memory reallocation function that will expand
+  a memory space pointed to by the pointer. This newly expanded space will 
+  be filled with zeros (if the new space is larger then the old space)
+
+  @param ptr - The origional pointer, or NULL for a new pointer
+  @param oldSize - The origional size of the memory allocated
+  @param newSize - The new size of the memory after allocation
+  @return The new pointer
+*/
+static void* crealloc(void* ptr, int oldSize, int newSize){
+  void* newPtr = NULL;
+  if (oldSize >= newSize){
+    newPtr = realloc(ptr, newSize);
+    if (!newPtr){
+      return NULL;
+    }
+  }
+  else {
+    newPtr = malloc(newSize);
+    if (!newPtr) return NULL;
+
+    memset(newPtr, 0, newSize);
+    if (ptr){
+      memcpy(newPtr, ptr, oldSize);
+    }
+  }
+
+  return newPtr;
+}
+
+/**
+  Read the message from standard in and return the message back to the
+  the caller as a char*
+  @return The json message from the console
+*/
+static char* readFromConsole(){
+  int charCount = 100;
+  int charIndex = 0;
+  char read = '\0';
+  char* input = (char*)crealloc(NULL, 0, charCount);
+  if (!input){
+    return NULL;
+  }
+
+  while((read = getchar()) != EOF){
+    input[charIndex++] = read;
+    if (charIndex >= charCount){
+      input = (char*)crealloc(input, (sizeof(char) * charCount), (sizeof(char) * charCount * 2));
+      charCount *= 2;
+      if (!input){
+        return NULL;
+      }
+    }
+  }
+
+  return input;
+}
+
+/**
+  Read the message from a file, and return the message back to the 
+  caller as a char*
+  @param fileName - The name of the file to read the message from
+  @return The json message from the file
+*/
+static char* readFromFile(const char* fileName, long long *dataRead){
+  FILE* jsonMessage = NULL;
+  jsonMessage = fopen(fileName, "r");
+  if (!jsonMessage){
+    return NULL;
+  }
+
+  fseek(jsonMessage, 0, SEEK_END);
+  long long fileSize = ftell(jsonMessage);
+  fseek(jsonMessage, 0, SEEK_SET);
+
+  char* message = (char*)crealloc(NULL, 0, (sizeof(char) * (fileSize + 1)));
+  if (!message){
+    return NULL;
+  }
+
+  *dataRead = fread(message, sizeof(char), fileSize, jsonMessage);
+  fclose(jsonMessage);
+
+  return message;
 }
 
 /**
@@ -76,12 +166,18 @@ static int parseCommandlineOptions(int argc, char* argv[]){
 /**
   The main function for the program
 */
-int main(int argc, char* argv[]){
+int main(int argc, char* argv[]) {
+  char* message = NULL;
+
+  //Set up the syslog 
+  openlog(argv[0], LOG_PID, LOG_USER);
+
+
   if (argc <= 1) {
-    usageAndExit(stderr, argv[0], 1);
+    standardin = true;
   }
 
-  int lastOptionIndex = parseCommandlineOptions(argc, argv);
+  parseCommandlineOptions(argc, argv);
 
   if (help){
     usageAndExit(stdout, argv[0], 0);
@@ -95,40 +191,36 @@ int main(int argc, char* argv[]){
   }
   
   int fileCount = 0;
-  FILE* jsonMessage = NULL;
 
-  if (lastOptionIndex < argc) {
+  if (standardin){
+    fileCount = 1;
+  }
+  else if (optind < argc) {
     fileCount = argc - optind;
+  }
+  
+  else {
+    standardin = true;
+    fileCount = 1;
   }
 
   while (fileCount > 0){
     fileCount--;
-    jsonMessage = fopen(argv[optind], "r");
-    if (!jsonMessage){
-      fprintf(stderr, "Unable to open file %s", argv[optind - 1]);
-      exit(1);
+    long long dataRead = 0;
+    const char* filename = "";
+    if (standardin){
+      message = readFromConsole();
+      filename = "stdin";
+    }
+    else {
+      message = readFromFile(argv[optind++], &dataRead);
+      filename = argv[optind - 1];
     }
 
-    fseek(jsonMessage, 0, SEEK_END);
-    long long fileSize = ftell(jsonMessage);
-    fseek(jsonMessage, 0, SEEK_SET);
-
-    char* message = malloc((fileSize + 1) * sizeof(char));
     if (!message){
-      fclose(jsonMessage);
-      fprintf(stderr, "Unable to allocate memory!");
+      fprintf(stderr, "Unable to read from file %s", filename);
       exit(1);
     }
-
-    long long dataRead = fread(message, sizeof(char), fileSize, jsonMessage);
-    fclose(jsonMessage);
-    if (dataRead != fileSize){
-      fprintf(stderr, "only read %lld of %lld bytes", dataRead, fileSize);
-      exit(1);
-    }
-  
-    //Add the terminator character before we pass the message to the parser
-    message[fileSize] = '\0'; 
 
     JSONParser_t* parser = newJSONParser();
     JSONKeyValue_t* document = NULL;
@@ -181,6 +273,8 @@ int main(int argc, char* argv[]){
 
   }
 
+  //Close out the system log
+  closelog();
   return EXIT_SUCCESS;
 }
 
