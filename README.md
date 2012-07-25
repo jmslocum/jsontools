@@ -6,11 +6,12 @@ is built and held in memory. This data structure can then be "queried" for infor
 
 ## Command line tool
 The jsontools command line tools is a quick interface and demo program for how to use the library. The
-tool can be used to print a json file "pretty" or to verify that the message is valid. 
+tool can be used to print a json file "pretty" or to verify that the message is valid. The pretty output
+is the defualt output.
 
 ```
 jsontools usage: 
-    jsontools [options] file1 file2 ... fileN
+    jsontools [options] [files]
 options:
     -h  --help    Print this messsage
     -v  --version Print the version number
@@ -18,6 +19,19 @@ options:
                   0 = good json, positive number = bad
 
 ```
+
+If you do not provide any switches or a file name, then it will read from standard in. This makes the
+program very useful for use in unix command chains. 
+
+```bash
+$ echo '{"Hello" : "World!"}' | jsontools
+{
+  "Hello" : "World!"
+}
+```
+
+The ability to pipe an "ugly" message to the tool and get the message out clean is great for checking 
+restful json message from a curl call.
 
 ## Library
 The JSONtools library is an opensource static library that can be linked against other C or C++ programs.
