@@ -237,6 +237,9 @@ int main(int argc, char* argv[]) {
         //otherwise, just exit with status 1
         if (!verify) {
           const char* errorReport = json_strerror(json_errno);
+          if (!standardin){
+            fprintf(stderr, "Error while parsing line %d\n", parser->lineNumber);
+          }
           fprintf(stderr, "%s\n", errorReport);
         }
        
