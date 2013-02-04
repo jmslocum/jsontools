@@ -30,6 +30,7 @@ version.h: version.txt
 		echo "#define REVISION \"$(shell git log -1 | grep commit | cut -d " " -f 2)\"" >> version.h
 
 install:
+		mkdir -p /usr/local/lib
 		cp libjsontools.a /usr/local/lib
 		mkdir -p /usr/local/include/JSONTools
 		cp include/*.h /usr/local/include/JSONTools
