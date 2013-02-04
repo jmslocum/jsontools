@@ -372,13 +372,13 @@ JSONError_t getArray(JSONKeyValue_t* pair, void* values[], JSONType_t types[]){
             
          case OBJECT: {
             types[index] = OBJECT;
-            values[index] = current->value->oVal;
+            values[index] = current;
             break;
          }
             
          case ARRAY: {
             types[index] = ARRAY;
-            values[index] = current->value->aVal;
+            values[index] = current;
             break;
          }
          
