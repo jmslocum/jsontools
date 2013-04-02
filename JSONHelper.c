@@ -756,7 +756,7 @@ JSONError_t convertString(const char* origional, char** convertedString){
 /**
  * Helper function that converts an integer (unicode character) to
  * a sequence of unicode bytes. The bytes can then be written into
- * a string and displayed on a UTF-8 compatable terminal or file 
+ * a string and displayed on a UTF-8 compatible terminal or file 
  * reader. 
  * 
  * @param character - The unicode character (up to 16 bits wide is what JSON allows)
@@ -765,7 +765,7 @@ JSONError_t convertString(const char* origional, char** convertedString){
  * 
  * @return - Number of bytes in utfBytes array.
  * 
- * NOTE - Always pass a char array of size 6 into the functon to avoid segfaulting
+ * NOTE - Always pass a char array of size 6 into the function to avoid segfaulting
  */
 static int convertToUTF8(unsigned int character, char utfBytes[]){
    if (!utfBytes){
@@ -779,7 +779,7 @@ static int convertToUTF8(unsigned int character, char utfBytes[]){
    }
    else if (character > 0x7F && character <= 0x7FF){
       /*
-       * 00000yyy yyxxxxxx origional 
+       * 00000yyy yyxxxxxx original 
        * 110yyyyy 10xxxxxx formatted
        */
       char x = (character & 0x3F);
@@ -793,7 +793,7 @@ static int convertToUTF8(unsigned int character, char utfBytes[]){
    }
    else if (character > 0x7FF && character <= 0xFFFF){
       /*
-       * zzzzyyyy yyxxxxxx          origional
+       * zzzzyyyy yyxxxxxx          original
        * 1110zzzz 10yyyyyy 10xxxxxx formatted
        */
        
