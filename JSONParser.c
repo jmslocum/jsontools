@@ -143,6 +143,9 @@ JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, ch
          parser->index++;
          parser->lineNumber++;
       }
+      else {
+         parser->index++;
+      }
    }
    
    //If we never found the first character and ran out of message
