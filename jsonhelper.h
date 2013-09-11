@@ -3,8 +3,8 @@
  
 #include <stdio.h>
 #include <stdbool.h>
-#include "JSONCommon.h"
-#include "JSONError.h"
+#include "jsoncommon.h"
+#include "jsonerror.h"
 
 #ifdef __cplusplus
 extern "C" {

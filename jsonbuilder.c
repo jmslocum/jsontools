@@ -6,7 +6,7 @@
 #include <ctype.h>
 #include <math.h>
 
-#include "JSONTools.h"
+#include "jsontools.h"
 
 /*-------------------------------------------------------------------
  * Implement global functions 

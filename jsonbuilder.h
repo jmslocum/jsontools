@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
-#include "JSONCommon.h"
+#include "jsoncommon.h"
 
 #ifdef __cplusplus
 extern "C" {

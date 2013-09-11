@@ -1,7 +1,7 @@
 #ifndef JSON_ERROR_H
 #define JSON_ERROR_H
 
-#include "JSONCommon.h"
+#include "jsoncommon.h"
 
 /**
  * Define the common errors that can occure when working with JSON messages

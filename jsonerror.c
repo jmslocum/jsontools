@@ -3,8 +3,8 @@
 #include <string.h>
 #include <errno.h>
 
-#include "JSONError.h"
-#include "JSONParser.h"
+#include "jsonerror.h"
+#include "jsonparser.h"
 
 int json_errno;
 

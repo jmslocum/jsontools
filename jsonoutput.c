@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <math.h>
 
-#include "JSONTools.h"
+#include "jsontools.h"
 
 /*-----------------------------------------------------------------
  * Private Helper functions 

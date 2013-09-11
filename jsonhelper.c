@@ -3,7 +3,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 
-#include "JSONTools.h"
+#include "jsontools.h"
 
 /*-----------------------------------------------------------------
  * Declare private static functions
@@ -316,6 +316,8 @@ JSONError_t removeChildPairs(JSONKeyValue_t* parent, const char* key){
 }
 
 /**
+ * TODO - This needs to be reworked to return an array of JSONKeyValue_t*
+ *
  * Gets an array of the types if the pair represents an array, Since 
  * a valid JSON array can contain values of different types, the function
  * will return an array of void pointers containing the objects, and an

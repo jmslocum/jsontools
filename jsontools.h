@@ -37,12 +37,12 @@
  * them individually. 
  */
 
-#include "JSONCommon.h"
-#include "JSONParser.h"
-#include "JSONBuilder.h"
-#include "JSONOutput.h"
-#include "JSONError.h"
-#include "JSONHelper.h"
+#include "jsoncommon.h"
+#include "jsonparser.h"
+#include "jsonbuilder.h"
+#include "jsonoutput.h"
+#include "jsonerror.h"
+#include "jsonhelper.h"
 
 #endif
 

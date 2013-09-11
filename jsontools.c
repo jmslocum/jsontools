@@ -8,23 +8,28 @@
 #include <unistd.h>
 #include <syslog.h>
 
-#include "version.h"
-#include "JSONTools.h"
+#include <config.h>
+#include "revision.h"
+#include "jsontools.h"
 
 static bool version = false;
 static bool help = false;
 static bool verify = false;
 static bool standardin = false;
+static char* key = NULL;
+static char* delimit = NULL;
 
 static struct option longOptions[] = {
-  {"help",    no_argument,    NULL,   'h'},
-  {"version", no_argument,    NULL,   'v'},
-  {"verify",  no_argument,    NULL,   'r'},
-  { 0,        0,              0,       0 }
+  {"help",    no_argument,       NULL,   'h'},
+  {"version", no_argument,       NULL,   'v'},
+  {"verify",  no_argument,       NULL,   'r'},
+  {"key",     required_argument, NULL,   'k'},
+  {"delimit", required_argument, NULL,   'd'},
+  { 0,        0,                 0,       0 }
 };
 
-static const char* shortOptions = "hvr";
-
+static const char* shortOptions = "hvrk:d:";
+static char* findValueForKey(char* key, char* delimit, JSONKeyValue_t* document);
 
 /**
   This function will print the help menu and exit with the
@@ -42,6 +47,9 @@ static void usageAndExit(FILE* term, char* programName, int exitCode){
   fprintf(term, "\t-v  --version Print the version number\n");
   fprintf(term, "\t-r  --verify  only a 0 or 1 return value\n");
   fprintf(term, "\t              0 = good json, positive number = bad\n");
+  fprintf(term, "\t-k  --key     Print the value of the given key\n");
+  fprintf(term, "\t              only for string, number, bool, or null\n");
+  fprintf(term, "\t-d  --delimit Specify a seperator for multi-level keys\n");
   exit(exitCode);
 }
 
@@ -153,6 +161,12 @@ static int parseCommandlineOptions(int argc, char* argv[]){
       case 'r' :
         verify = true;
         break;
+      case 'k' :
+         key = strdup(optarg);
+         break;
+      case 'd' :
+         delimit = strdup(optarg);
+         break;
       case '?' :
         break;
       default :
@@ -163,10 +177,17 @@ static int parseCommandlineOptions(int argc, char* argv[]){
   return optIndex;
 }
 
+static char* findValueForKey(char* key, char* delimit, JSONKeyValue_t* document){
+   
+   return NULL;
+}
+
+
 /**
   The main function for the program
 */
 int main(int argc, char* argv[]) {
+  int exitcode = EXIT_SUCCESS;
   char* message = NULL;
 
   //Set up the syslog 
@@ -179,14 +200,20 @@ int main(int argc, char* argv[]) {
 
   parseCommandlineOptions(argc, argv);
 
+  if (key){
+     if (!delimit){
+        delimit = strdup(".");
+     }
+  }
+
   if (help){
     usageAndExit(stdout, argv[0], 0);
   }
 
   if (version) {
     printf("author: James Slocum\n");
-    printf("version: %s\n", VERSION);
-    printf("revision: \"%s\"\n", REVISION);
+    printf("version: %s\n", VERSION); //from config.h
+    printf("revision: \"%s\"\n", REVISION); //from revision.h
     exit(0);
   }
   
@@ -247,24 +274,34 @@ int main(int argc, char* argv[]) {
         exit(status);
       }
 
-      char* parsedDocument = NULL;
-      int messageLength;
-      status = documentToString(document, &parsedDocument, &messageLength);
+      if (key){
+         char* value = findValueForKey(key, delimit, document);
+         if (!value){
+            fprintf(stdout, "key not found!\n");
+            exitcode = 1;
+         }
+      }
+      else {
+         char* parsedDocument = NULL;
+         int messageLength;
+         status = documentToString(document, &parsedDocument, &messageLength);
 
-      if (status){
-        if (!verify){
-          const char* errorReport = json_strerror(json_errno);
-          fprintf(stderr, "%s\n", errorReport);
-        }
+         if (status){
+           if (!verify){
+             const char* errorReport = json_strerror(json_errno);
+             fprintf(stderr, "%s\n", errorReport);
+           }
+         }
+
+         if (!verify){
+           fprintf(stdout, "%s\n", parsedDocument);
+         }
+
+         if (parsedDocument){
+           free(parsedDocument);
+         }
       }
 
-      if (!verify){
-        fprintf(stdout, "%s\n", parsedDocument);
-      }
-
-      if (parsedDocument){
-        free(parsedDocument);
-      }
       disposeOfPair(document);
 
     } while (status == JSON_SUCCESS && lastIndex > 0);
@@ -276,6 +313,6 @@ int main(int argc, char* argv[]) {
 
   //Close out the system log
   closelog();
-  return EXIT_SUCCESS;
+  return exitcode;
 }
 

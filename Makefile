@@ -1,6 +1,6 @@
 SWITCH= -DTOOLSTEST
-OBJS= JSONError.o JSONHelper.o JSONBuilder.o JSONOutput.o JSONParser.o
-FLAGS=-Iinclude/ --std=c99 -Wall
+OBJS= jsonerror.o jsonhelper.o jsonbuilder.o jsonoutput.o jsonparser.o
+FLAGS= --std=gnu99 -Wall
 #FLAGS += -ggdb
 FLAGS += -O3
 		
@@ -10,20 +10,20 @@ all: jsontools.c version.h staticlib
 staticlib: $(OBJS)
 		ar -cr libjsontools.a $(OBJS)
 
-JSONParser.o: JSONParser.c
-		gcc -c $(FLAGS) JSONParser.c -o JSONParser.o
+jsonparser.o: jsonparser.c
+		gcc -c $(FLAGS) jsonparser.c -o jsonparser.o
 		
-JSONBuilder.o: JSONBuilder.c
-		gcc -c $(FLAGS) JSONBuilder.c -o JSONBuilder.o
+jsonbuilder.o: jsonbuilder.c
+		gcc -c $(FLAGS) jsonbuilder.c -o jsonbuilder.o
 		
-JSONOutput.o: JSONOutput.c
-		gcc -c $(FLAGS) JSONOutput.c -o JSONOutput.o
+jsonoutput.o: jsonoutput.c
+		gcc -c $(FLAGS) jsonoutput.c -o jsonoutput.o
 		
-JSONError.o: JSONError.c
-		gcc -c $(FLAGS) JSONError.c -o JSONError.o
+jsonerror.o: jsonerror.c
+		gcc -c $(FLAGS) jsonerror.c -o jsonerror.o
 		
-JSONHelper.o: JSONHelper.c
-		gcc -c $(FLAGS) JSONHelper.c -o JSONHelper.o
+jsonhelper.o: jsonhelper.c
+		gcc -c $(FLAGS) jsonhelper.c -o jsonhelper.o
 
 version.h: version.txt
 		echo "#define VERSION \"$(shell cat version.txt)\"" > version.h
@@ -32,8 +32,8 @@ version.h: version.txt
 install:
 		mkdir -p /usr/local/lib
 		cp libjsontools.a /usr/local/lib
-		mkdir -p /usr/local/include/JSONTools
-		cp include/*.h /usr/local/include/JSONTools
+		mkdir -p /usr/local/include/jsonTools
+		cp include/*.h /usr/local/include/jsonTools
 		cp jsontools /usr/local/bin
 
 clean:

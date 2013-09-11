@@ -5,7 +5,7 @@
 #include <ctype.h>
 #include <errno.h>
 
-#include "JSONTools.h"
+#include "jsontools.h"
 
 /*----------------------------------------------------------------
  * Define private helper functions

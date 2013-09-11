@@ -1,7 +1,7 @@
 #ifndef _JSON_OUTPUT_H
 #define _JSON_OUTPUT_H
 
-#include "JSONCommon.h"
+#include "jsoncommon.h"
 
 #ifdef __cplusplus
 extern "C" {

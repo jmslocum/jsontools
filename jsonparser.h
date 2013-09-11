@@ -1,8 +1,8 @@
 #ifndef _JSON_PARSER_H
 #define _JSON_PARSER_H
 
-#include "JSONCommon.h"
-#include "JSONError.h"
+#include "jsoncommon.h"
+#include "jsonerror.h"
 
 #define PUSH_ERROR(parser, error, errNo) (pushError(parser, error, __func__, __FILE__, __LINE__, errNo))
 
