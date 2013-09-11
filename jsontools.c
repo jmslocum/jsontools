@@ -9,7 +9,6 @@
 #include <syslog.h>
 
 #include <config.h>
-#include "revision.h"
 #include "jsontools.h"
 
 static bool version = false;
@@ -213,7 +212,6 @@ int main(int argc, char* argv[]) {
   if (version) {
     printf("author: James Slocum\n");
     printf("version: %s\n", VERSION); //from config.h
-    printf("revision: \"%s\"\n", REVISION); //from revision.h
     exit(0);
   }
   
