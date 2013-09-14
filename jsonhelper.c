@@ -316,7 +316,6 @@ JSONError_t removeChildPairs(JSONKeyValue_t* parent, const char* key){
 }
 
 /**
- * TODO - This needs to be reworked to return an array of JSONKeyValue_t*
  *
  * Gets an array of the types if the pair represents an array, Since 
  * a valid JSON array can contain values of different types, the function
@@ -325,74 +324,23 @@ JSONError_t removeChildPairs(JSONKeyValue_t* parent, const char* key){
  * 
  * @param pair - The JSONKeyValue pair object that contains the array
  * 
- * @param values - an array of void pointers that will be populated with the objects
+ * @param values - an array of JSONKeyValue_t pointers that will be 
+ *                 populated with the objects
  * 
  * @param types - the types of each of those objects contained in values
  * 
  * @return - SUCCESS, or an error 
  */
-JSONError_t getArray(JSONKeyValue_t* pair, void* values[], JSONType_t types[]){
-   if (!pair || !values || !types){
+JSONError_t getArray(JSONKeyValue_t* pair, JSONKeyValue_t** values){
+   if (!pair || !values){
       return JSON_NULL_ARGUMENT;
    }
    
    if (pair->type != ARRAY){
       return JSON_INVALID_ARGUMENT;
    }
-   
-   JSONKeyValue_t* current = pair->value->aVal;
-   int index = 0;
-   while(current != NULL){
-      switch(current->type){
-         case STRING: {
-            types[index] = STRING;
-            values[index] = current->value->sVal;
-            break;
-         }
-         
-         case NUMBER: {
-            types[index] = NUMBER;
-            double* newNum = (double*)malloc(sizeof(double));
-            *newNum = current->value->nVal;
-            values[index] = newNum;
-            break;
-         }
-         
-         case BOOLEAN: {
-            types[index] = BOOLEAN;
-            bool* newBool = (bool*)malloc(sizeof(bool));
-            *newBool = current->value->bVal;
-            values[index] = newBool;
-            break;
-         }
-            
-         case NIL: {
-            types[index] = NIL;
-            values[index] = NULL;
-            break;
-         }
-            
-         case OBJECT: {
-            types[index] = OBJECT;
-            values[index] = current;
-            break;
-         }
-            
-         case ARRAY: {
-            types[index] = ARRAY;
-            values[index] = current;
-            break;
-         }
-         
-         default: {
-            return JSON_INVALID_TYPE;
-            break;
-         }
-      }
-      
-      index++;
-      current = current->next;
-   }
+  
+   *values = pair->value->aVal;
    
    return JSON_SUCCESS;
 }

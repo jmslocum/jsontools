@@ -17,7 +17,7 @@ JSONKeyValue_t** getAllChildPairs(JSONKeyValue_t* parent, int* length);
 JSONKeyValue_t** getAllChildrenFromObject(JSONValue_t* obj, int* length);
 JSONError_t removeChildPair(JSONKeyValue_t* parent, const char* key);
 JSONError_t removeChildPairs(JSONKeyValue_t* parent, const char* key);
-JSONError_t getArray(JSONKeyValue_t* pair, void* values[], JSONType_t types[]);
+JSONError_t getArray(JSONKeyValue_t* pair, JSONKeyValue_t** values); 
 JSONError_t getString(JSONKeyValue_t* pair, char** value);
 JSONError_t getNumber(JSONKeyValue_t* pair, double* value);
 JSONError_t getBoolean(JSONKeyValue_t* pair, bool* value);
