@@ -38,12 +38,32 @@ JSONParser_t* newJSONParser(){
       return NULL;
    }
    
-   memset(newParser, 0, sizeof(JSONParser_t));
-   
-   //Set the parser to look for the beginning of a JSON message
-   newParser->state = (OPEN_PREN || OPEN_BRACKET);  
-         
+   JSONError_t ret = initJSONParser(newParser);
+   if (ret != JSON_SUCCESS){
+      return NULL;
+   }
+
    return newParser;
+}
+
+/**
+   Initialize a parser so it is ready to begin parsing a message
+
+   @param[out] - The parser that will be initialized
+   @return JSON_SUCCESS on success, JSON_NULL_ARGUMENT if the
+      parser is not a valid pointer
+*/
+JSONError_t initJSONParser(JSONParser_t* parser){
+   if (!parser){
+      json_errno = JSON_NULL_ARGUMENT;
+      return JSON_NULL_ARGUMENT;
+   }
+
+   memset(parser, 0, sizeof(JSONParser_t));
+
+   parser->state = (OPEN_PREN || OPEN_BRACKET);
+
+   return JSON_SUCCESS;
 }
 
 /**
@@ -59,18 +79,22 @@ void resetParser(JSONParser_t* parser){
       return;
    }
    
-   parser->index = 0;
-   parser->state = (OPEN_PREN || OPEN_BRACKET);
-   parser->lineNumber = 0;
-   parser->depth = 0;
-   parser->keyStackIndex = 0;
-   memset(parser->tracebackString, 0, sizeof(char) * TRACE_LENGTH);
-   parser->jsonError = 0;
-   parser->outsideError = -1;
-   
-   return;
+   initJSONParser(parser);
 }
 
+/**
+   This will free the memory held by the parser if it was created
+   with newJSONParser(). 
+
+   @param[in] parser - The parser whos memory will be freed
+*/
+void disposeOfJSONParser(JSONParser_t* parser){
+   if (!parser){
+      return;
+   }
+
+   free(parser);
+}
 
 /**
  * Builds the document model for the specific JSON message that has 
