@@ -84,201 +84,31 @@ JSONKeyValue_t* getChildPair(JSONKeyValue_t* parent, const char* key){
 }
 
 /**
- * Gets the child elements for this JSON object. This is useful to reterive
- * nested key:value pairs from JSON object types, when the objects 
- * have the same key. If this key value pair does not represent an 
- * object type (has no children), or if none of the children have
- * the requested key then NULL is returned. 
- * 
- * @param parent - The parent key:value pair whos value is another key:value pair
- * 
- * @param key - The key string of the key:value pair you want to reterive. 
- * 
- * @param length - The number of key:value pairs found
- * 
- * @return - The JSONKeyValue_t* object that matches the request, or NULL
- */
-JSONKeyValue_t** getChildPairs(JSONKeyValue_t* parent, const char* key, int* length){
-   if (!parent || !key || !length){
-      return NULL;
-   }
-   
-   if (parent->type != OBJECT){
-      *length = -1;
-      return NULL;
-   }
-   
-   //Count how many pairs match the key requested
-   int count = 0;
-   JSONKeyValue_t* current = parent->value->oVal;
-   
-   while(current != NULL){
-      if (current->type != NIL){
-         if (strcmp(current->key, key) == 0){
-            count++;
-         }
-      }
-   }
-   
-   if (count <= 0){
-      *length = 0;
-      return NULL;
-   }
-   
-   //Create an array of the correct size and start adding those pairs to the array
-   JSONKeyValue_t** pairs = (JSONKeyValue_t**) malloc(sizeof(JSONKeyValue_t*) * count);
-   *length = count;
-   int index = 0;
-   current = parent->value->oVal;
-   while(current != NULL){
-      if (current->type != NIL){
-         if (strcmp(current->key, key) == 0){
-            pairs[index++] = current;
-         }
-      }
-   }
-   
-   return pairs;
-}
-
-/**
- * Gets the child elements for this JSON object. This is useful to reterive
+ * Gets the child elements for this JSON object or array. This is useful to reterive
  * nested key:value pairs from JSON object types, regardless of the key.
- * The order of the elements will be preserved, and nulls will be inserted
- * where null JSON values are found. If this key value pair does not represent an 
- * object type (has no children), or if none of the children have
- * the requested key then NULL is returned.
+ * The order of the elements will be preserved, If this key value pair does not represent an 
+ * object or array type, then NULL is returned.
  * 
  * @param parent - The parent key:value pair whos value is another key:value pair
  * 
- * @param length - The number of key:value pairs found
- * 
- * @return - The JSONKeyValue_t* object that matches the request, or NULL
- *           Remember to free() or delete the returned object when you are
- *           done using it.
+ * @return - The JSONKeyValue_t* object list that holds all the children, or NULL
+ *
  */
-JSONKeyValue_t** getAllChildPairs(JSONKeyValue_t* parent, int* length){
-   if (!parent || !length){
+JSONKeyValue_t* getAllChildPairs(JSONKeyValue_t* parent){
+   if (!parent){
       return NULL;
    }
    
-   if (parent->type != OBJECT){
-      *length = -1;
-      return NULL;
+   JSONKeyValue_t* current = NULL;
+   
+   if (parent->type == OBJECT){
+      current = parent->value->oVal;
+   }
+   else if (parent->type == ARRAY){
+      current = parent->value->aVal;
    }
    
-   //Loop through the linked list of JSON values and add them to the array
-   int index = 0;
-   JSONKeyValue_t* current = parent->value->oVal;
-   JSONKeyValue_t** pairs = (JSONKeyValue_t**) malloc(sizeof(JSONKeyValue_t*) * parent->length);
-   current = parent->value->oVal;
-   while(current != NULL){
-      pairs[index] = current;
-   
-      current = current->next;
-      index++;
-   }
-   
-   *length = parent->length;
-   return pairs;
-}
-
-/**
- * Removes the first key:value pair from the object that matches the 
- * specified key. This will move the other pairs so that the rest of the
- * object is maintained. 
- * 
- * @param parent - A JSON object pair
- * @param key - The key of the key:value pair to remove
- * @return SUCCESS if the pair was removed, NO_MATCHING_PAIR if the pair could not be found, error otherwise
- */
-JSONError_t removeChildPair(JSONKeyValue_t* parent, const char* key){
-   if (!parent || !key){
-      return JSON_NULL_ARGUMENT;
-   }
-   
-   if (parent->type != OBJECT){
-      return JSON_INVALID_ARGUMENT;
-   }
-   
-   //Start looking through the list for the pair with the requested key
-   //Make sure we ignore null values because they don't have keys. 
-   JSONKeyValue_t* previous = parent->value->oVal;
-   JSONKeyValue_t* current = parent->value->oVal;
-   JSONKeyValue_t* next = current->next;
-   while(current != NULL){
-      if (current->type != NIL){
-         if (strcmp(current->key, key) == 0){
-            previous->next = next;
-            disposeOfPair(current);
-            parent->length--;
-            return JSON_SUCCESS;
-         }
-      }
-      
-      previous = current;
-      current = current->next;
-      if (current != NULL) {
-         next = current->next;
-      }
-      else {
-         next = NULL;
-      }
-   }
-   
-   return JSON_NO_MATCHING_PAIR;
-}
-
-/**
- * Removes the first key:value pair from the object that matches the 
- * specified key. This will move the other pairs so that the rest of the
- * object is maintained. 
- * 
- * @param parent - A JSON object pair
- * @param key - The key of the key:value pair to remove
- * @return SUCCESS if the pair was removed, NO_MATCHING_PAIR if the pair could not be found, error otherwise
- */
-JSONError_t removeChildPairs(JSONKeyValue_t* parent, const char* key){
-   if (!parent || !key){
-      return JSON_NULL_ARGUMENT;
-   }
-   
-   if (parent->type != OBJECT){
-      return JSON_INVALID_ARGUMENT;
-   }
-   
-   //Start looking through the list for the pair with the requested key
-   //Make sure we ignore null values because they don't have keys. 
-   JSONKeyValue_t* previous = parent->value->oVal;
-   JSONKeyValue_t* current = parent->value->oVal;
-   JSONKeyValue_t* next = current->next;
-   int found = 0;
-   while(current != NULL){
-      if (current->type != NIL){
-         if (strcmp(current->key, key) == 0){
-            previous->next = next;
-            disposeOfPair(current);
-            //Now that we have disposed of the element, we need to point to a safe one
-            current = previous;
-            parent->length--;
-         }
-      }
-      
-      previous = current;
-      current = current->next;
-      if (current != NULL) {
-         next = current->next;
-      }
-      else {
-         next = NULL;
-      }
-   }
-   
-   if (found){
-      return JSON_SUCCESS;
-   }
-   
-   return JSON_NO_MATCHING_PAIR;
+   return current;
 }
 
 /**
@@ -292,8 +122,6 @@ JSONError_t removeChildPairs(JSONKeyValue_t* parent, const char* key){
  * 
  * @param values - an array of JSONKeyValue_t pointers that will be 
  *                 populated with the objects
- * 
- * @param types - the types of each of those objects contained in values
  * 
  * @return - SUCCESS, or an error 
  */
@@ -399,6 +227,7 @@ JSONType_t getPairType(JSONKeyValue_t* pair){
    
    return pair->type;
 }
+
 
 /**
  * This function returns the string value that this pair has. It is 

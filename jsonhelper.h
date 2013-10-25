@@ -12,10 +12,7 @@ extern "C" {
 
 bool hasChildPair(JSONKeyValue_t* parent, const char* key);
 JSONKeyValue_t* getChildPair(JSONKeyValue_t* parent, const char* key);
-JSONKeyValue_t** getChildPairs(JSONKeyValue_t* parent, const char* key, int* length);
-JSONKeyValue_t** getAllChildPairs(JSONKeyValue_t* parent, int* length);
-JSONError_t removeChildPair(JSONKeyValue_t* parent, const char* key);
-JSONError_t removeChildPairs(JSONKeyValue_t* parent, const char* key);
+JSONKeyValue_t* getAllChildPairs(JSONKeyValue_t* parent);
 JSONError_t getArray(JSONKeyValue_t* pair, JSONKeyValue_t** values); 
 JSONError_t getString(JSONKeyValue_t* pair, char** value);
 JSONError_t getNumber(JSONKeyValue_t* pair, double* value);
