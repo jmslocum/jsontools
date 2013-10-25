@@ -154,6 +154,8 @@ JSONKeyValue_t** getChildPairs(JSONKeyValue_t* parent, const char* key, int* len
  * @param length - The number of key:value pairs found
  * 
  * @return - The JSONKeyValue_t* object that matches the request, or NULL
+ *           Remember to free() or delete the returned object when you are
+ *           done using it.
  */
 JSONKeyValue_t** getAllChildPairs(JSONKeyValue_t* parent, int* length){
    if (!parent || !length){
@@ -178,42 +180,6 @@ JSONKeyValue_t** getAllChildPairs(JSONKeyValue_t* parent, int* length){
    }
    
    *length = parent->length;
-   return pairs;
-}
-
-JSONKeyValue_t** getAllChildrenFromObject(JSONValue_t* obj, int* length){
-   if (!obj || !length){
-      return NULL;
-   }
-   
-   if (!obj->oVal){
-      *length = -1;
-      return NULL;
-   }
-   
-   //Find out how many elements are under this object
-   JSONKeyValue_t* current = obj->oVal;
-   int count = 0;
-   for (count = 0; current != NULL; current = current->next, count++);
-   
-   JSONKeyValue_t** pairs = (JSONKeyValue_t**) malloc(sizeof(JSONKeyValue_t*) * count);
-   //Loop through the linked list of JSON values and add them to the array
-   int index = 0;
-   current = obj->oVal;
-   
-   while(current != NULL){
-      if (current->type == NIL) {
-         pairs[index] = NULL;
-      }
-      else {
-         pairs[index] = current;
-      }
-      
-      current = current->next;
-      index++;
-   }
-   
-   *length = count;
    return pairs;
 }
 
