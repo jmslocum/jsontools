@@ -11,13 +11,13 @@
  * Define private helper functions
  *---------------------------------------------------------------*/
  
-static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size, char** result);
-static JSONError_t parseJSONNumber(JSONParser_t* parser, char* message, int size, double* result);
-static JSONError_t parseJSONBoolean(JSONParser_t* parser, char* message, int size, bool* result);
-static JSONError_t parseJSONNull(JSONParser_t* parser, char* message, int size);
-static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size, JSONValue_t** result);
-static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size, JSONKeyValue_t** result);
-static JSONError_t parseJSONKey(JSONParser_t* parser, char* message, int size);
+static JSONError_t parseJSONString(JSONParser_t* parser, const char* message, int size, char** result);
+static JSONError_t parseJSONNumber(JSONParser_t* parser, const char* message, int size, double* result);
+static JSONError_t parseJSONBoolean(JSONParser_t* parser, const char* message, int size, bool* result);
+static JSONError_t parseJSONNull(JSONParser_t* parser, const char* message, int size);
+static JSONError_t parseJSONObject(JSONParser_t* parser, const char* message, int size, JSONValue_t** result);
+static JSONError_t parseJSONArray(JSONParser_t* parser, const char* message, int size, JSONKeyValue_t** result);
+static JSONError_t parseJSONKey(JSONParser_t* parser, const char* message, int size);
 static void pushError(JSONParser_t* parser, JSONError_t error, const char* currentFunction, const char* currentFile, int line, int errNo);
 /*----------------------------------------------------------------
  * Implement global functions
@@ -115,7 +115,7 @@ void disposeOfJSONParser(JSONParser_t* parser){
  * 
  * @return JSON_SUCCESS if the message was parsed correctly, an error otherwise.
  */
-JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, char* message, int* lastIndex){
+JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, const char* message, int* lastIndex){
    if (!parser || !document || !message){
       PUSH_ERROR(parser, JSON_NULL_ARGUMENT, -1);
       json_errno = JSON_NULL_ARGUMENT;
@@ -273,7 +273,7 @@ JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, ch
  * @param result - The string that is parsed out will be put here
  * @return JSON_SUCCESS if the string was parsed correctly, error otherwise (see stack trace)
  */
-static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size, char** result) {
+static JSONError_t parseJSONString(JSONParser_t* parser, const char* message, int size, char** result) {
    if (!parser){
       PUSH_ERROR(parser, JSON_NULL_ARGUMENT, -1);
       json_errno = JSON_NULL_ARGUMENT;
@@ -389,7 +389,7 @@ static JSONError_t parseJSONString(JSONParser_t* parser, char* message, int size
  * @param result - The number that is parsed out will be put here
  * @return JSON_SUCCESS if the number was parsed correctly, error otherwise (see stack trace)
  */
-static JSONError_t parseJSONNumber(JSONParser_t* parser, char* message, int size, double* result){
+static JSONError_t parseJSONNumber(JSONParser_t* parser, const char* message, int size, double* result){
    int tempSize = 48;
    char temp[tempSize];
    int tempIndex = 0;
@@ -462,7 +462,7 @@ static JSONError_t parseJSONNumber(JSONParser_t* parser, char* message, int size
  * @param result - The boolean that is parsed out will be put here
  * @return JSON_SUCCESS if the boolean was parsed correctly, error otherwise (see stack trace)
  */
-static JSONError_t parseJSONBoolean(JSONParser_t* parser, char* message, int size, bool* result){
+static JSONError_t parseJSONBoolean(JSONParser_t* parser, const char* message, int size, bool* result){
    int tempSize = 6;
    char temp[tempSize + 1];
    int tempIndex = 0;
@@ -514,7 +514,7 @@ static JSONError_t parseJSONBoolean(JSONParser_t* parser, char* message, int siz
  * @param size - The length of the message
  * @return JSON_SUCCESS if the null was parsed correctly, error otherwise (see stack trace)
  */
-static JSONError_t parseJSONNull(JSONParser_t* parser, char* message, int size) {
+static JSONError_t parseJSONNull(JSONParser_t* parser, const char* message, int size) {
    int tempSize = 5;
    char temp[tempSize + 1];
    int tempIndex = 0;
@@ -565,7 +565,7 @@ static JSONError_t parseJSONNull(JSONParser_t* parser, char* message, int size) 
  * @param result - The object that is parsed out will be put here
  * @return JSON_SUCCESS if the object was parsed correctly, error otherwise (see stack trace)
  */
-static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size, JSONValue_t** result) {
+static JSONError_t parseJSONObject(JSONParser_t* parser, const char* message, int size, JSONValue_t** result) {
    if (parser->depth >= MAX_DEPTH){
       PUSH_ERROR(parser, JSON_MESSAGE_TOO_LARGE, -1);
       json_errno = JSON_MESSAGE_TOO_LARGE;
@@ -834,7 +834,7 @@ static JSONError_t parseJSONObject(JSONParser_t* parser, char* message, int size
  * @param result - The array that is parsed out will be put here
  * @return JSON_SUCCESS if the array was parsed correctly, error otherwise (see stack trace)
  */
-static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size, JSONKeyValue_t** result){
+static JSONError_t parseJSONArray(JSONParser_t* parser, const char* message, int size, JSONKeyValue_t** result){
    int arraySize = 12;
    void** elements = (void**) malloc(sizeof(void*) * (arraySize + 1));
    JSONType_t* types = (JSONType_t*) malloc(sizeof(JSONType_t) * (arraySize + 1));
@@ -1088,7 +1088,7 @@ static JSONError_t parseJSONArray(JSONParser_t* parser, char* message, int size,
  * @param size - The length of the message
  * @return JSON_SUCCESS if the key was parsed correctly, error otherwise (see stack trace)
  */
-static JSONError_t  parseJSONKey(JSONParser_t* parser, char* message, int size){
+static JSONError_t  parseJSONKey(JSONParser_t* parser, const char* message, int size){
    char temp[0x100];
    int tempIndex = 0;
    

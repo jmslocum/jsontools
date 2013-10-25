@@ -74,7 +74,7 @@ extern "C" {
 JSONParser_t* newJSONParser();
 JSONError_t initJSONParser(JSONParser_t* parser);
 void resetParser(JSONParser_t* parser);
-JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, char* message, int* lastIndex);
+JSONError_t parseJSONMessage(JSONParser_t* parser, JSONKeyValue_t** document, const char* message, int* lastIndex);
 void disposeOfJSONParser(JSONParser_t* parser);
 
 #ifdef __cplusplus
